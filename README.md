@@ -5,7 +5,7 @@ Official Go SDK for [ProofChain](https://proofchain.co.za) - blockchain-anchored
 ## Installation
 
 ```bash
-go get github.com/proofchain/proofchain-go
+go get github.com/ProofChainZA/proofchain-go
 ```
 
 ## Quick Start
@@ -18,7 +18,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/proofchain/proofchain-go/proofchain"
+    "github.com/ProofChainZA/proofchain-go/proofchain"
 )
 
 func main() {
@@ -60,7 +60,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/proofchain/proofchain-go/proofchain"
+    "github.com/ProofChainZA/proofchain-go/proofchain"
 )
 
 func main() {
@@ -110,7 +110,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/proofchain/proofchain-go/proofchain"
+    "github.com/ProofChainZA/proofchain-go/proofchain"
 )
 
 func main() {
@@ -165,7 +165,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/proofchain/proofchain-go/proofchain"
+    "github.com/ProofChainZA/proofchain-go/proofchain"
 )
 
 func main() {
@@ -218,7 +218,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/proofchain/proofchain-go/proofchain"
+    "github.com/ProofChainZA/proofchain-go/proofchain"
 )
 
 func main() {

@@ -9,7 +9,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/proofchain/proofchain-go/proofchain"
+	"github.com/ProofChainZA/proofchain-go/proofchain"
 )
 
 func main() {

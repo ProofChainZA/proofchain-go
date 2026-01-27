@@ -241,11 +241,8 @@ func (c *IngestionClient) IngestBatch(ctx context.Context, req *BatchIngestReque
 		}
 	}
 
-	payload := map[string]interface{}{
-		"events": events,
-	}
-
-	body, err := json.Marshal(payload)
+	// Batch endpoint expects array directly, not wrapped in {"events": [...]}
+	body, err := json.Marshal(events)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
