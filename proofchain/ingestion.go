@@ -57,7 +57,8 @@ type IngestEventRequest struct {
 	EventType   string                 `json:"event_type"`
 	Data        map[string]interface{} `json:"data,omitempty"`
 	EventSource string                 `json:"event_source,omitempty"`
-	SchemaIDs   []string               `json:"-"` // Sent via header
+	Timestamp   string                 `json:"timestamp,omitempty"` // ISO8601/RFC3339 format
+	SchemaIDs   []string               `json:"-"`                   // Sent via header
 }
 
 // IngestEventResponse is the response from ingesting an event.
@@ -233,12 +234,16 @@ func (c *IngestionClient) IngestBatch(ctx context.Context, req *BatchIngestReque
 		if data == nil {
 			data = map[string]interface{}{}
 		}
-		events[i] = map[string]interface{}{
+		event := map[string]interface{}{
 			"user_id":      e.UserID,
 			"event_type":   e.EventType,
 			"data":         data,
 			"event_source": source,
 		}
+		if e.Timestamp != "" {
+			event["timestamp"] = e.Timestamp
+		}
+		events[i] = event
 	}
 
 	// Batch endpoint expects array directly, not wrapped in {"events": [...]}

@@ -4,12 +4,14 @@ package proofchain
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/ProofChainZA/proofchain-go/proofchain/pb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -260,13 +262,93 @@ func (c *GRPCClient) StreamEventsSlice(ctx context.Context, events []*GRPCEvent)
 }
 
 func (c *GRPCClient) runSingleStream(ctx context.Context, conn *grpc.ClientConn, events <-chan *GRPCEvent) (sent, success, failed int64) {
-	// This is a simplified implementation - in production you'd use the generated proto client
-	// For now, we'll use the HTTP fallback for actual streaming
-	for event := range events {
-		_ = event // Process event
-		sent++
-		success++ // Assume success for now
+	// Create EventService client from the generated proto
+	client := pb.NewEventServiceClient(conn)
+
+	// Open bidirectional stream
+	stream, err := client.StreamEvents(ctx)
+	if err != nil {
+		// If stream fails to open, count all events as failed
+		for range events {
+			sent++
+			failed++
+		}
+		return
 	}
+
+	// Start goroutine to receive responses
+	responseChan := make(chan *pb.EventResponse, 1000)
+	go func() {
+		defer close(responseChan)
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				return
+			}
+			responseChan <- resp
+		}
+	}()
+
+	// Send events
+	for event := range events {
+		// Convert GRPCEvent to proto EventRequest
+		req := &pb.EventRequest{
+			TenantId:     "", // Will be set from API key context
+			UserId:       event.UserID,
+			EventType:    event.EventType,
+			DocumentHash: event.DocumentHash,
+		}
+
+		// Add timestamp if provided
+		if event.Timestamp != nil {
+			req.Timestamp = &pb.Timestamp{
+				Seconds: event.Timestamp.Unix(),
+				Nanos:   int32(event.Timestamp.Nanosecond()),
+			}
+		}
+
+		// Convert Data map to Metadata
+		if event.Data != nil {
+			req.Metadata = &pb.Metadata{
+				Fields: make(map[string]string),
+			}
+			for k, v := range event.Data {
+				// Convert value to string (JSON for complex types)
+				switch val := v.(type) {
+				case string:
+					req.Metadata.Fields[k] = val
+				default:
+					jsonBytes, _ := json.Marshal(val)
+					req.Metadata.Fields[k] = string(jsonBytes)
+				}
+			}
+		}
+
+		if err := stream.Send(req); err != nil {
+			failed++
+		} else {
+			sent++
+		}
+	}
+
+	// Close send side
+	stream.CloseSend()
+
+	// Drain responses
+	for resp := range responseChan {
+		if resp.Status == "error" || resp.Status == "failed" {
+			failed++
+		} else {
+			success++
+		}
+	}
+
+	// Adjust counts - success should be based on responses received
+	// If we didn't get responses for all sent, count difference as success (async processing)
+	if success == 0 && failed == 0 {
+		success = sent // Assume all sent were successful if no explicit failures
+	}
+
 	return
 }
 
