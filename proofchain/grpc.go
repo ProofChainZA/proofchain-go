@@ -372,7 +372,7 @@ func (c *GRPCClient) runMultiStream(ctx context.Context, events <-chan *GRPCEven
 	// Create per-stream channels
 	streamChans := make([]chan *GRPCEvent, numConns)
 	for i := range streamChans {
-		streamChans[i] = make(chan *GRPCEvent, 1000)
+		streamChans[i] = make(chan *GRPCEvent, 10000)
 	}
 
 	var wg sync.WaitGroup
@@ -460,7 +460,7 @@ func NewMultiStreamClient(apiKey string, opts ...GRPCClientOption) (*MultiStream
 
 	return &MultiStreamClient{
 		GRPCClient: grpcClient,
-		eventChan:  make(chan *GRPCEvent, 10000),
+		eventChan:  make(chan *GRPCEvent, 100000),
 		doneChan:   make(chan struct{}),
 	}, nil
 }
