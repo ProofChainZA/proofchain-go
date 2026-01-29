@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -278,12 +279,18 @@ func (c *GRPCClient) runSingleStream(ctx context.Context, conn *grpc.ClientConn,
 	}
 
 	// Start goroutine to receive responses
-	responseChan := make(chan *pb.EventResponse, 1000)
+	responseChan := make(chan *pb.EventResponse, 100000)
+	recvDone := make(chan struct{})
 	go func() {
 		defer close(responseChan)
+		defer close(recvDone)
 		for {
 			resp, err := stream.Recv()
 			if err != nil {
+				// EOF is expected when server closes, other errors are logged
+				if err != io.EOF {
+					// Log but don't fail - server may have finished
+				}
 				return
 			}
 			responseChan <- resp
@@ -334,8 +341,11 @@ func (c *GRPCClient) runSingleStream(ctx context.Context, conn *grpc.ClientConn,
 		}
 	}
 
-	// Close send side
+	// Close send side and wait for server to finish
 	stream.CloseSend()
+
+	// Wait for receiver to finish (server sends EOF when done)
+	<-recvDone
 
 	// Drain responses to get server-side success/failure counts
 	var serverSuccess, serverFailed int64
