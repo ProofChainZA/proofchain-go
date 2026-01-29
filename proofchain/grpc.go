@@ -45,6 +45,7 @@ type StreamStats struct {
 	TotalSent     int64
 	TotalSuccess  int64
 	TotalFailed   int64
+	TotalDropped  int64 // Events dropped due to buffer full (only for TrySend)
 	Duration      time.Duration
 	EventsPerSec  float64
 	ActiveStreams int
@@ -289,6 +290,9 @@ func (c *GRPCClient) runSingleStream(ctx context.Context, conn *grpc.ClientConn,
 		}
 	}()
 
+	// Track send errors separately from server-side failures
+	var sendErrors int64
+
 	// Send events
 	for event := range events {
 		// Convert GRPCEvent to proto EventRequest
@@ -324,29 +328,35 @@ func (c *GRPCClient) runSingleStream(ctx context.Context, conn *grpc.ClientConn,
 			}
 		}
 
+		sent++ // Count all attempts
 		if err := stream.Send(req); err != nil {
-			failed++
-		} else {
-			sent++
+			sendErrors++
 		}
 	}
 
 	// Close send side
 	stream.CloseSend()
 
-	// Drain responses
+	// Drain responses to get server-side success/failure counts
+	var serverSuccess, serverFailed int64
 	for resp := range responseChan {
 		if resp.Status == "error" || resp.Status == "failed" {
-			failed++
+			serverFailed++
 		} else {
-			success++
+			serverSuccess++
 		}
 	}
 
-	// Adjust counts - success should be based on responses received
-	// If we didn't get responses for all sent, count difference as success (async processing)
-	if success == 0 && failed == 0 {
-		success = sent // Assume all sent were successful if no explicit failures
+	// Calculate final counts:
+	// - If we got responses, use them as the authoritative count
+	// - If no responses (async processing), assume sent - sendErrors succeeded
+	if serverSuccess > 0 || serverFailed > 0 {
+		success = serverSuccess
+		failed = serverFailed + sendErrors
+	} else {
+		// No responses received - assume all successfully sent events succeeded
+		success = sent - sendErrors
+		failed = sendErrors
 	}
 
 	return
@@ -407,6 +417,7 @@ type MultiStreamClient struct {
 	wg        sync.WaitGroup
 	started   bool
 	mu        sync.Mutex
+	dropped   int64 // Count of events dropped by TrySend
 }
 
 // NewMultiStreamClient creates a client optimized for high-throughput streaming.
@@ -474,9 +485,32 @@ func (c *MultiStreamClient) Start(ctx context.Context) {
 	}()
 }
 
-// Send queues an event for streaming. Non-blocking if buffer has space.
-// Returns false if the client is not started or buffer is full.
+// Send queues an event for streaming, blocking if the buffer is full.
+// This ensures no events are silently dropped.
+// Automatically starts the streaming session on first call if not already started.
 func (c *MultiStreamClient) Send(event *GRPCEvent) bool {
+	c.mu.Lock()
+	if !c.started {
+		c.started = true
+		c.wg.Add(1)
+		go func() {
+			defer c.wg.Done()
+			stats, err := c.StreamEvents(context.Background(), c.eventChan)
+			c.stats = stats
+			c.err = err
+			close(c.doneChan)
+		}()
+	}
+	c.mu.Unlock()
+
+	c.eventChan <- event
+	return true
+}
+
+// TrySend attempts to queue an event without blocking.
+// Returns false if the client is not started or buffer is full.
+// Use Send() instead unless you need non-blocking behavior and handle drops.
+func (c *MultiStreamClient) TrySend(event *GRPCEvent) bool {
 	c.mu.Lock()
 	started := c.started
 	c.mu.Unlock()
@@ -489,17 +523,19 @@ func (c *MultiStreamClient) Send(event *GRPCEvent) bool {
 	case c.eventChan <- event:
 		return true
 	default:
+		atomic.AddInt64(&c.dropped, 1)
 		return false
 	}
 }
 
-// SendBlocking queues an event, blocking if the buffer is full.
+// SendBlocking is an alias for Send (which now blocks by default).
+// Deprecated: Use Send() instead.
 func (c *MultiStreamClient) SendBlocking(event *GRPCEvent) {
 	c.eventChan <- event
 }
 
 // Flush closes the event channel and waits for all events to be sent.
-// Returns the final statistics.
+// Returns the final statistics including any dropped events from TrySend.
 func (c *MultiStreamClient) Flush() (*StreamStats, error) {
 	c.mu.Lock()
 	if !c.started {
@@ -510,6 +546,12 @@ func (c *MultiStreamClient) Flush() (*StreamStats, error) {
 
 	close(c.eventChan)
 	c.wg.Wait()
+
+	// Add dropped count to stats
+	if c.stats != nil {
+		c.stats.TotalDropped = atomic.LoadInt64(&c.dropped)
+	}
+
 	return c.stats, c.err
 }
 
