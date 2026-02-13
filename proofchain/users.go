@@ -7,7 +7,11 @@ import (
 	"time"
 )
 
-// EndUser represents an end-user discovered from events
+// =============================================================================
+// Types
+// =============================================================================
+
+// EndUser represents an end-user discovered from events.
 type EndUser struct {
 	ID             string                 `json:"id"`
 	ExternalID     string                 `json:"external_id"`
@@ -39,7 +43,7 @@ type EndUser struct {
 	DiscoveredAt   *time.Time             `json:"discovered_at,omitempty"`
 }
 
-// EndUserListResponse is a paginated list of users
+// EndUserListResponse is a paginated list of users.
 type EndUserListResponse struct {
 	Users    []EndUser `json:"users"`
 	Total    int       `json:"total"`
@@ -48,24 +52,83 @@ type EndUserListResponse struct {
 	HasMore  bool      `json:"has_more"`
 }
 
-// UserActivity represents a user's activity event
-type UserActivity struct {
-	EventID   string                 `json:"event_id"`
-	EventType string                 `json:"event_type"`
-	Timestamp time.Time              `json:"timestamp"`
-	Data      map[string]interface{} `json:"data"`
-}
-
-// UserActivityResponse is a paginated activity response
+// UserActivityResponse is the activity summary for a user.
 type UserActivityResponse struct {
-	UserID     string         `json:"user_id"`
-	Activities []UserActivity `json:"activities"`
-	Total      int            `json:"total"`
-	Page       int            `json:"page"`
-	PageSize   int            `json:"page_size"`
+	UserID         string                   `json:"user_id"`
+	ExternalID     string                   `json:"external_id"`
+	TotalEvents    int                      `json:"total_events"`
+	EventsByType   map[string]int           `json:"events_by_type"`
+	EventsByDay    []map[string]interface{} `json:"events_by_day"`
+	RecentEvents   []map[string]interface{} `json:"recent_events"`
+	RewardsEarned  int                      `json:"rewards_earned"`
+	RewardsPending int                      `json:"rewards_pending"`
 }
 
+// UserReward represents a single earned reward.
+type UserReward struct {
+	ID            string   `json:"id"`
+	RewardName    string   `json:"reward_name"`
+	RewardType    string   `json:"reward_type"`
+	Value         *float64 `json:"value,omitempty"`
+	ValueCurrency *string  `json:"value_currency,omitempty"`
+	Status        string   `json:"status"`
+	EarnedAt      *string  `json:"earned_at,omitempty"`
+	DistributedAt *string  `json:"distributed_at,omitempty"`
+	NFTTokenID    *int     `json:"nft_token_id,omitempty"`
+	NFTTxHash     *string  `json:"nft_tx_hash,omitempty"`
+}
+
+// UserRewardsResponse is a paginated list of user rewards.
+type UserRewardsResponse struct {
+	UserID   string       `json:"user_id"`
+	Rewards  []UserReward `json:"rewards"`
+	Total    int          `json:"total"`
+	Page     int          `json:"page"`
+	PageSize int          `json:"page_size"`
+	HasMore  bool         `json:"has_more"`
+}
+
+// WalletCreationResult is the response from wallet creation/registration.
+type WalletCreationResult struct {
+	Success       bool    `json:"success"`
+	UserID        string  `json:"user_id"`
+	WalletAddress string  `json:"wallet_address"`
+	WalletType    *string `json:"wallet_type,omitempty"`
+	Network       *string `json:"network,omitempty"`
+	Source        string  `json:"source"`
+}
+
+// GDPRDeletionResponse is the response from a GDPR deletion.
+type GDPRDeletionResponse struct {
+	Success        bool           `json:"success"`
+	UserID         string         `json:"user_id"`
+	ExternalID     string         `json:"external_id"`
+	DeletedRecords map[string]int `json:"deleted_records"`
+	MerkleWarning  *string        `json:"merkle_warning,omitempty"`
+	AuditID        *string        `json:"audit_id,omitempty"`
+}
+
+// GDPRPreviewResponse is the response from a GDPR deletion preview.
+type GDPRPreviewResponse struct {
+	User          map[string]interface{} `json:"user"`
+	WouldDelete   map[string]int         `json:"would_delete"`
+	MerkleWarning *string                `json:"merkle_warning,omitempty"`
+}
+
+// PointsResult is the response from adding/subtracting points.
+type PointsResult struct {
+	UserID         string `json:"user_id"`
+	PointsAdded    int    `json:"points_added"`
+	NewBalance     int    `json:"new_balance"`
+	LifetimePoints int    `json:"lifetime_points"`
+	Reason         string `json:"reason"`
+}
+
+// =============================================================================
 // Request types
+// =============================================================================
+
+// CreateEndUserRequest creates a new end-user.
 type CreateEndUserRequest struct {
 	ExternalID    string                 `json:"external_id"`
 	Email         *string                `json:"email,omitempty"`
@@ -81,10 +144,10 @@ type CreateEndUserRequest struct {
 	Bio           *string                `json:"bio,omitempty"`
 	WalletAddress *string                `json:"wallet_address,omitempty"`
 	Segments      []string               `json:"segments,omitempty"`
-	Tags          map[string]interface{} `json:"tags,omitempty"`
 	Attributes    map[string]interface{} `json:"attributes,omitempty"`
 }
 
+// UpdateEndUserRequest updates an end-user profile.
 type UpdateEndUserRequest struct {
 	Email       *string                `json:"email,omitempty"`
 	FirstName   *string                `json:"first_name,omitempty"`
@@ -103,6 +166,7 @@ type UpdateEndUserRequest struct {
 	Attributes  map[string]interface{} `json:"attributes,omitempty"`
 }
 
+// ListEndUsersOptions configures the List query.
 type ListEndUsersOptions struct {
 	Page      int
 	PageSize  int
@@ -110,32 +174,59 @@ type ListEndUsersOptions struct {
 	Status    string
 	Segment   string
 	HasWallet *bool
+	MinEvents *int
 	SortBy    string
 	SortOrder string
 }
 
+// LinkWalletRequest links an external wallet to a user.
 type LinkWalletRequest struct {
 	WalletAddress string  `json:"wallet_address"`
 	WalletSource  *string `json:"wallet_source,omitempty"`
 	Signature     *string `json:"signature,omitempty"`
 }
 
-type MergeUsersRequest struct {
-	SourceUserID string `json:"source_user_id"`
-	TargetUserID string `json:"target_user_id"`
+// CreateUserWalletRequest creates a CDP wallet for an end-user.
+type CreateUserWalletRequest struct {
+	WalletType string `json:"wallet_type,omitempty"`
+	Network    string `json:"network,omitempty"`
 }
 
-// EndUsersClient provides end-user operations
+// RegisterWalletRequest registers an external wallet.
+type RegisterWalletRequest struct {
+	WalletAddress string  `json:"wallet_address"`
+	Signature     *string `json:"signature,omitempty"`
+}
+
+// MergeUsersRequest merges source users into a target user.
+type MergeUsersRequest struct {
+	SourceUserIDs []string `json:"source_user_ids"`
+	TargetUserID  string   `json:"target_user_id"`
+}
+
+// GDPRDeletionRequest requests permanent deletion of user data.
+type GDPRDeletionRequest struct {
+	Confirm       bool    `json:"confirm"`
+	DeleteEvents  *bool   `json:"delete_events,omitempty"`
+	DeleteWallets *bool   `json:"delete_wallets,omitempty"`
+	Reason        *string `json:"reason,omitempty"`
+}
+
+// =============================================================================
+// Client
+// =============================================================================
+
+// EndUsersClient provides end-user operations.
 type EndUsersClient struct {
 	http *HTTPClient
 }
 
-// NewEndUsersClient creates a new end-users client
+// NewEndUsersClient creates a new end-users client.
 func NewEndUsersClient(http *HTTPClient) *EndUsersClient {
 	return &EndUsersClient{http: http}
 }
 
-// List returns paginated end-users
+// List returns paginated end-users.
 func (u *EndUsersClient) List(ctx context.Context, opts *ListEndUsersOptions) (*EndUserListResponse, error) {
 	params := url.Values{}
 	if opts != nil {
@@ -157,6 +248,9 @@ func (u *EndUsersClient) List(ctx context.Context, opts *ListEndUsersOptions) (*
 		if opts.HasWallet != nil {
 			params.Set("has_wallet", fmt.Sprintf("%t", *opts.HasWallet))
 		}
+		if opts.MinEvents != nil {
+			params.Set("min_events", fmt.Sprintf("%d", *opts.MinEvents))
+		}
 		if opts.SortBy != "" {
 			params.Set("sort_by", opts.SortBy)
 		}
@@ -173,7 +267,7 @@ func (u *EndUsersClient) List(ctx context.Context, opts *ListEndUsersOptions) (*
 	return &response, nil
 }
 
-// Get returns an end-user by ID
+// Get returns an end-user by internal UUID.
 func (u *EndUsersClient) Get(ctx context.Context, userID string) (*EndUser, error) {
 	var user EndUser
 	err := u.http.Get(ctx, "/end-users/"+userID, nil, &user)
@@ -183,17 +277,17 @@ func (u *EndUsersClient) Get(ctx context.Context, userID string) (*EndUser, erro
 	return &user, nil
 }
 
-// GetByExternalID returns an end-user by external ID
+// GetByExternalID returns an end-user by external ID.
 func (u *EndUsersClient) GetByExternalID(ctx context.Context, externalID string) (*EndUser, error) {
 	var user EndUser
-	err := u.http.Get(ctx, "/end-users/external/"+url.PathEscape(externalID), nil, &user)
+	err := u.http.Get(ctx, "/end-users/by-external/"+url.PathEscape(externalID), nil, &user)
 	if err != nil {
 		return nil, err
 	}
 	return &user, nil
 }
 
-// Create creates an end-user manually
+// Create creates an end-user manually.
 func (u *EndUsersClient) Create(ctx context.Context, req *CreateEndUserRequest) (*EndUser, error) {
 	var user EndUser
 	err := u.http.Post(ctx, "/end-users", req, &user)
@@ -203,7 +297,7 @@ func (u *EndUsersClient) Create(ctx context.Context, req *CreateEndUserRequest) 
 	return &user, nil
 }
 
-// Update updates an end-user profile
+// Update updates an end-user profile by internal UUID.
 func (u *EndUsersClient) Update(ctx context.Context, userID string, req *UpdateEndUserRequest) (*EndUser, error) {
 	var user EndUser
 	err := u.http.Patch(ctx, "/end-users/"+userID, req, &user)
@@ -213,88 +307,121 @@ func (u *EndUsersClient) Update(ctx context.Context, userID string, req *UpdateE
 	return &user, nil
 }
 
-// Delete deletes an end-user
-func (u *EndUsersClient) Delete(ctx context.Context, userID string) error {
-	return u.http.Delete(ctx, "/end-users/"+userID)
-}
-
-// LinkWallet links a wallet to an end-user
-func (u *EndUsersClient) LinkWallet(ctx context.Context, userID string, req *LinkWalletRequest) (*EndUser, error) {
+// UpdateByExternalID updates an end-user profile by external ID.
+func (u *EndUsersClient) UpdateByExternalID(ctx context.Context, externalID string, req *UpdateEndUserRequest) (*EndUser, error) {
 	var user EndUser
-	err := u.http.Post(ctx, "/end-users/"+userID+"/wallet", req, &user)
+	err := u.http.Patch(ctx, "/end-users/by-external/"+url.PathEscape(externalID), req, &user)
 	if err != nil {
 		return nil, err
 	}
 	return &user, nil
 }
 
-// UnlinkWallet unlinks wallet from an end-user
-func (u *EndUsersClient) UnlinkWallet(ctx context.Context, userID string) (*EndUser, error) {
+// LinkWallet links a wallet to an end-user by external ID.
+func (u *EndUsersClient) LinkWallet(ctx context.Context, externalID string, req *LinkWalletRequest) (*EndUser, error) {
 	var user EndUser
-	err := u.http.Request(ctx, "DELETE", "/end-users/"+userID+"/wallet", nil, &user)
+	err := u.http.Post(ctx, "/end-users/by-external/"+url.PathEscape(externalID)+"/link-wallet", req, &user)
 	if err != nil {
 		return nil, err
 	}
 	return &user, nil
 }
 
-// GetActivity returns user activity/events
-func (u *EndUsersClient) GetActivity(ctx context.Context, userID string, page, pageSize int, eventType string) (*UserActivityResponse, error) {
+// CreateWallet creates a CDP (custodial) wallet for an end-user by external ID.
+func (u *EndUsersClient) CreateWallet(ctx context.Context, externalID string, req *CreateUserWalletRequest) (*WalletCreationResult, error) {
+	var result WalletCreationResult
+	err := u.http.Post(ctx, "/end-users/by-external/"+url.PathEscape(externalID)+"/create-wallet", req, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// RegisterWallet registers an external wallet for an end-user by external ID.
+func (u *EndUsersClient) RegisterWallet(ctx context.Context, externalID string, req *RegisterWalletRequest) (*WalletCreationResult, error) {
+	var result WalletCreationResult
+	err := u.http.Post(ctx, "/end-users/by-external/"+url.PathEscape(externalID)+"/register-wallet", req, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// GetActivity returns user activity summary by external ID.
+func (u *EndUsersClient) GetActivity(ctx context.Context, externalID string, days int) (*UserActivityResponse, error) {
 	params := url.Values{}
-	if page > 0 {
-		params.Set("page", fmt.Sprintf("%d", page))
-	}
-	if pageSize > 0 {
-		params.Set("page_size", fmt.Sprintf("%d", pageSize))
-	}
-	if eventType != "" {
-		params.Set("event_type", eventType)
+	if days > 0 {
+		params.Set("days", fmt.Sprintf("%d", days))
 	}
 
 	var response UserActivityResponse
-	err := u.http.Get(ctx, "/end-users/"+userID+"/activity", params, &response)
+	err := u.http.Get(ctx, "/end-users/by-external/"+url.PathEscape(externalID)+"/activity", params, &response)
 	if err != nil {
 		return nil, err
 	}
 	return &response, nil
 }
 
-// AddPoints adds points to a user
-func (u *EndUsersClient) AddPoints(ctx context.Context, userID string, points int, reason string) (*EndUser, error) {
-	var user EndUser
-	err := u.http.Post(ctx, "/end-users/"+userID+"/points", map[string]interface{}{
-		"points": points,
-		"reason": reason,
-	}, &user)
+// AddPoints adds or subtracts points from a user by external ID.
+func (u *EndUsersClient) AddPoints(ctx context.Context, externalID string, points int, reason string) (*PointsResult, error) {
+	params := url.Values{}
+	params.Set("points", fmt.Sprintf("%d", points))
+	if reason != "" {
+		params.Set("reason", reason)
+	}
+
+	var result PointsResult
+	path := "/end-users/by-external/" + url.PathEscape(externalID) + "/add-points?" + params.Encode()
+	err := u.http.Post(ctx, path, map[string]interface{}{}, &result)
 	if err != nil {
 		return nil, err
 	}
-	return &user, nil
+	return &result, nil
 }
 
-// AddSegment adds a segment to a user
-func (u *EndUsersClient) AddSegment(ctx context.Context, userID string, segment string) (*EndUser, error) {
-	var user EndUser
-	err := u.http.Post(ctx, "/end-users/"+userID+"/segments", map[string]interface{}{
-		"segment": segment,
-	}, &user)
+// GetRewards returns rewards earned by a user by external ID.
+func (u *EndUsersClient) GetRewards(ctx context.Context, externalID string, status string, page, pageSize int) (*UserRewardsResponse, error) {
+	params := url.Values{}
+	if status != "" {
+		params.Set("status", status)
+	}
+	if page > 0 {
+		params.Set("page", fmt.Sprintf("%d", page))
+	}
+	if pageSize > 0 {
+		params.Set("page_size", fmt.Sprintf("%d", pageSize))
+	}
+
+	var response UserRewardsResponse
+	err := u.http.Get(ctx, "/end-users/by-external/"+url.PathEscape(externalID)+"/rewards", params, &response)
 	if err != nil {
 		return nil, err
 	}
-	return &user, nil
+	return &response, nil
 }
 
-// RemoveSegment removes a segment from a user
-func (u *EndUsersClient) RemoveSegment(ctx context.Context, userID string, segment string) (*EndUser, error) {
-	var user EndUser
-	err := u.http.Request(ctx, "DELETE", "/end-users/"+userID+"/segments/"+url.PathEscape(segment), nil, &user)
+// GetRewardsByInternalID returns rewards earned by a user by internal UUID.
+func (u *EndUsersClient) GetRewardsByInternalID(ctx context.Context, userID string, status string, page, pageSize int) (*UserRewardsResponse, error) {
+	params := url.Values{}
+	if status != "" {
+		params.Set("status", status)
+	}
+	if page > 0 {
+		params.Set("page", fmt.Sprintf("%d", page))
+	}
+	if pageSize > 0 {
+		params.Set("page_size", fmt.Sprintf("%d", pageSize))
+	}
+
+	var response UserRewardsResponse
+	err := u.http.Get(ctx, "/end-users/"+userID+"/rewards", params, &response)
 	if err != nil {
 		return nil, err
 	}
-	return &user, nil
+	return &response, nil
 }
 
-// Merge merges two users
+// Merge merges source users into a target user.
 func (u *EndUsersClient) Merge(ctx context.Context, req *MergeUsersRequest) (*EndUser, error) {
 	var user EndUser
 	err := u.http.Post(ctx, "/end-users/merge", req, &user)
@@ -302,4 +429,66 @@ func (u *EndUsersClient) Merge(ctx context.Context, req *MergeUsersRequest) (*En
 		return nil, err
 	}
 	return &user, nil
+}
+
+// =============================================================================
+// Convenience methods
+// =============================================================================
+
+// UpdateAttributes merges the provided attributes into the user's existing attributes by external ID.
+func (u *EndUsersClient) UpdateAttributes(ctx context.Context, externalID string, attributes map[string]interface{}) (*EndUser, error) {
+	return u.UpdateByExternalID(ctx, externalID, &UpdateEndUserRequest{
+		Attributes: attributes,
+	})
+}
+
+// RemoveAttributes removes specific attribute keys from a user by external ID.
+// Fetches the current user, removes the keys, and saves.
+func (u *EndUsersClient) RemoveAttributes(ctx context.Context, externalID string, keys []string) (*EndUser, error) {
+	user, err := u.GetByExternalID(ctx, externalID)
+	if err != nil {
+		return nil, err
+	}
+
+	attributes := make(map[string]interface{})
+	for k, v := range user.Attributes {
+		attributes[k] = v
+	}
+	for _, key := range keys {
+		delete(attributes, key)
+	}
+
+	return u.UpdateByExternalID(ctx, externalID, &UpdateEndUserRequest{
+		Attributes: attributes,
+	})
+}
+
+// SetProfile sets profile fields on a user by external ID.
+// Only the non-nil fields in the request are updated.
+func (u *EndUsersClient) SetProfile(ctx context.Context, externalID string, req *UpdateEndUserRequest) (*EndUser, error) {
+	return u.UpdateByExternalID(ctx, externalID, req)
+}
+
+// =============================================================================
+// GDPR
+// =============================================================================
+
+// GDPRPreview previews what would be deleted for a GDPR request.
+func (u *EndUsersClient) GDPRPreview(ctx context.Context, userID string) (*GDPRPreviewResponse, error) {
+	var result GDPRPreviewResponse
+	err := u.http.Get(ctx, "/end-users/"+userID+"/gdpr/preview", nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// GDPRDelete permanently deletes all user data (Right to Be Forgotten).
+func (u *EndUsersClient) GDPRDelete(ctx context.Context, userID string, req *GDPRDeletionRequest) (*GDPRDeletionResponse, error) {
+	var result GDPRDeletionResponse
+	err := u.http.Request(ctx, "DELETE", "/end-users/"+userID+"/gdpr", req, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
 }

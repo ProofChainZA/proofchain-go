@@ -513,6 +513,6 @@ func (p *PassportClient) GetHistory(ctx context.Context, userID string, opts *Pa
 	}
 
 	var history []PassportHistory
-	err := p.http.Get(ctx, "/passports/"+url.PathEscape(userID)+"/history?"+params.Encode(), nil, &history)
+	err := p.http.Get(ctx, "/passports/"+url.PathEscape(userID)+"/history", params, &history)
 	return history, err
 }

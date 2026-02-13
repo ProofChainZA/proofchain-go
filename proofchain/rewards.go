@@ -125,6 +125,12 @@ func (r *RewardsClient) ListDefinitions(ctx context.Context, opts *ListRewardsOp
 		if opts.RewardType != "" {
 			params.Set("reward_type", opts.RewardType)
 		}
+		if opts.Limit > 0 {
+			params.Set("limit", fmt.Sprintf("%d", opts.Limit))
+		}
+		if opts.Offset > 0 {
+			params.Set("offset", fmt.Sprintf("%d", opts.Offset))
+		}
 	}
 
 	var definitions []RewardDefinition
