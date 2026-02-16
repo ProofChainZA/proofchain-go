@@ -504,7 +504,9 @@ func (u *EndUsersClient) EnsureWallet(ctx context.Context, externalID string, ne
 				smart = &existingWallets[i]
 			}
 		}
+
 		if eoa != nil && smart != nil {
+			// Both exist — return immediately
 			return &EnsureWalletResult{
 				UserID:      externalID,
 				AssetWallet: *eoa,
@@ -513,9 +515,50 @@ func (u *EndUsersClient) EnsureWallet(ctx context.Context, externalID string, ne
 				Created:     false,
 			}, nil
 		}
+
+		if eoa != nil && smart == nil {
+			// EOA exists but no Smart Account — create only the Smart Account
+			var smartWallet Wallet
+			err = u.http.Post(ctx, "/wallets", &CreateWalletRequest{
+				UserID:     externalID,
+				WalletType: "smart",
+				Network:    eoa.Network,
+				Metadata:   map[string]interface{}{"owner_wallet_id": eoa.WalletID},
+			}, &smartWallet)
+			if err != nil {
+				return nil, err
+			}
+			return &EnsureWalletResult{
+				UserID:      externalID,
+				AssetWallet: *eoa,
+				SmartWallet: smartWallet,
+				Network:     eoa.Network,
+				Created:     true,
+			}, nil
+		}
+
+		if smart != nil && eoa == nil {
+			// Smart Account exists but no EOA — create only the EOA
+			var eoaWallet Wallet
+			err = u.http.Post(ctx, "/wallets", &CreateWalletRequest{
+				UserID:     externalID,
+				WalletType: "eoa",
+				Network:    smart.Network,
+			}, &eoaWallet)
+			if err != nil {
+				return nil, err
+			}
+			return &EnsureWalletResult{
+				UserID:      externalID,
+				AssetWallet: eoaWallet,
+				SmartWallet: *smart,
+				Network:     smart.Network,
+				Created:     true,
+			}, nil
+		}
 	}
 
-	// Create dual wallets
+	// No wallets at all — create dual wallets
 	var dual DualWallets
 	err = u.http.Post(ctx, "/wallets/dual", &CreateDualWalletsRequest{
 		UserID:  externalID,
