@@ -488,7 +488,7 @@ type EnsureWalletResult struct {
 // immediately. If not, creates a dual wallet pair via the CDP SDK.
 func (u *EndUsersClient) EnsureWallet(ctx context.Context, externalID string, network string) (*EnsureWalletResult, error) {
 	if network == "" {
-		network = "base-sepolia"
+		network = "base-mainnet"
 	}
 
 	// Check for existing wallets
