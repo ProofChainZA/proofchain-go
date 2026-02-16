@@ -491,18 +491,20 @@ func (u *EndUsersClient) EnsureWallet(ctx context.Context, externalID string, ne
 		network = "base-mainnet"
 	}
 
-	// Check for existing wallets
-	var existingWallets []Wallet
-	err := u.http.Get(ctx, "/wallets/user/"+url.PathEscape(externalID), nil, &existingWallets)
-	if err == nil && len(existingWallets) > 0 {
+	// Check for existing wallets via /all endpoint (returns grouped object, never 404)
+	var userWallets struct {
+		UserID       string   `json:"user_id"`
+		AssetWallets []Wallet `json:"asset_wallets"`
+		SmartWallets []Wallet `json:"smart_wallets"`
+	}
+	err := u.http.Get(ctx, "/wallets/user/"+url.PathEscape(externalID)+"/all", nil, &userWallets)
+	if err == nil {
 		var eoa, smart *Wallet
-		for i := range existingWallets {
-			switch existingWallets[i].WalletType {
-			case "eoa":
-				eoa = &existingWallets[i]
-			case "smart":
-				smart = &existingWallets[i]
-			}
+		if len(userWallets.AssetWallets) > 0 {
+			eoa = &userWallets.AssetWallets[0]
+		}
+		if len(userWallets.SmartWallets) > 0 {
+			smart = &userWallets.SmartWallets[0]
 		}
 
 		if eoa != nil && smart != nil {
