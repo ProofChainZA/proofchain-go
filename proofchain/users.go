@@ -54,28 +54,28 @@ type EndUserListResponse struct {
 
 // UserActivityResponse is the activity summary for a user.
 type UserActivityResponse struct {
-	UserID       string                    `json:"user_id"`
-	ExternalID   string                    `json:"external_id"`
-	TotalEvents  int                       `json:"total_events"`
-	EventsByType map[string]int            `json:"events_by_type"`
-	EventsByDay  []map[string]interface{}   `json:"events_by_day"`
-	RecentEvents []map[string]interface{}   `json:"recent_events"`
-	RewardsEarned  int                     `json:"rewards_earned"`
-	RewardsPending int                     `json:"rewards_pending"`
+	UserID         string                   `json:"user_id"`
+	ExternalID     string                   `json:"external_id"`
+	TotalEvents    int                      `json:"total_events"`
+	EventsByType   map[string]int           `json:"events_by_type"`
+	EventsByDay    []map[string]interface{} `json:"events_by_day"`
+	RecentEvents   []map[string]interface{} `json:"recent_events"`
+	RewardsEarned  int                      `json:"rewards_earned"`
+	RewardsPending int                      `json:"rewards_pending"`
 }
 
 // UserReward represents a single earned reward.
 type UserReward struct {
-	ID            string  `json:"id"`
-	RewardName    string  `json:"reward_name"`
-	RewardType    string  `json:"reward_type"`
+	ID            string   `json:"id"`
+	RewardName    string   `json:"reward_name"`
+	RewardType    string   `json:"reward_type"`
 	Value         *float64 `json:"value,omitempty"`
-	ValueCurrency *string `json:"value_currency,omitempty"`
-	Status        string  `json:"status"`
-	EarnedAt      *string `json:"earned_at,omitempty"`
-	DistributedAt *string `json:"distributed_at,omitempty"`
-	NFTTokenID    *int    `json:"nft_token_id,omitempty"`
-	NFTTxHash     *string `json:"nft_tx_hash,omitempty"`
+	ValueCurrency *string  `json:"value_currency,omitempty"`
+	Status        string   `json:"status"`
+	EarnedAt      *string  `json:"earned_at,omitempty"`
+	DistributedAt *string  `json:"distributed_at,omitempty"`
+	NFTTokenID    *int     `json:"nft_token_id,omitempty"`
+	NFTTxHash     *string  `json:"nft_tx_hash,omitempty"`
 }
 
 // UserRewardsResponse is a paginated list of user rewards.
@@ -206,10 +206,10 @@ type MergeUsersRequest struct {
 
 // GDPRDeletionRequest requests permanent deletion of user data.
 type GDPRDeletionRequest struct {
-	Confirm      bool    `json:"confirm"`
-	DeleteEvents *bool   `json:"delete_events,omitempty"`
-	DeleteWallets *bool  `json:"delete_wallets,omitempty"`
-	Reason       *string `json:"reason,omitempty"`
+	Confirm       bool    `json:"confirm"`
+	DeleteEvents  *bool   `json:"delete_events,omitempty"`
+	DeleteWallets *bool   `json:"delete_wallets,omitempty"`
+	Reason        *string `json:"reason,omitempty"`
 }
 
 // =============================================================================
@@ -469,35 +469,69 @@ func (u *EndUsersClient) SetProfile(ctx context.Context, externalID string, req 
 	return u.UpdateByExternalID(ctx, externalID, req)
 }
 
-// EnsureWallet guarantees a user has a wallet, creating one if they don't.
+// EnsureWalletResult is the response from EnsureWallet, containing both wallets
+// and whether they were newly created.
+type EnsureWalletResult struct {
+	UserID      string `json:"user_id"`
+	AssetWallet Wallet `json:"asset_wallet"`
+	SmartWallet Wallet `json:"smart_wallet"`
+	Network     string `json:"network"`
+	Created     bool   `json:"created"`
+}
+
+// EnsureWallet guarantees a user has dual wallets (EOA + Smart Account),
+// creating them if they don't exist.
 //
-// This is the recommended way to guarantee a wallet exists before performing
+// This is the recommended way to guarantee wallets exist before performing
 // any wallet-dependent operation (e.g. attestation, on-chain claims, token
-// transfers). If the user already has a wallet, returns immediately with the
-// existing address. If not, creates a CDP wallet with the specified options.
-func (u *EndUsersClient) EnsureWallet(ctx context.Context, externalID string, req *CreateUserWalletRequest) (*WalletCreationResult, error) {
-	user, err := u.GetByExternalID(ctx, externalID)
+// transfers). If the user already has both wallet types, returns them
+// immediately. If not, creates a dual wallet pair via the CDP SDK.
+func (u *EndUsersClient) EnsureWallet(ctx context.Context, externalID string, network string) (*EnsureWalletResult, error) {
+	if network == "" {
+		network = "base-sepolia"
+	}
+
+	// Check for existing wallets
+	var existingWallets []Wallet
+	err := u.http.Get(ctx, "/wallets/user/"+url.PathEscape(externalID), nil, &existingWallets)
+	if err == nil && len(existingWallets) > 0 {
+		var eoa, smart *Wallet
+		for i := range existingWallets {
+			switch existingWallets[i].WalletType {
+			case "eoa":
+				eoa = &existingWallets[i]
+			case "smart":
+				smart = &existingWallets[i]
+			}
+		}
+		if eoa != nil && smart != nil {
+			return &EnsureWalletResult{
+				UserID:      externalID,
+				AssetWallet: *eoa,
+				SmartWallet: *smart,
+				Network:     eoa.Network,
+				Created:     false,
+			}, nil
+		}
+	}
+
+	// Create dual wallets
+	var dual DualWallets
+	err = u.http.Post(ctx, "/wallets/dual", &CreateDualWalletsRequest{
+		UserID:  externalID,
+		Network: network,
+	}, &dual)
 	if err != nil {
 		return nil, err
 	}
 
-	if user.WalletAddress != nil && *user.WalletAddress != "" {
-		result := &WalletCreationResult{
-			Success:       true,
-			UserID:        externalID,
-			WalletAddress: *user.WalletAddress,
-			Source:        "existing",
-		}
-		if user.WalletSource != nil {
-			result.WalletType = user.WalletSource
-		}
-		return result, nil
-	}
-
-	if req == nil {
-		req = &CreateUserWalletRequest{}
-	}
-	return u.CreateWallet(ctx, externalID, req)
+	return &EnsureWalletResult{
+		UserID:      dual.UserID,
+		AssetWallet: dual.AssetWallet,
+		SmartWallet: dual.SmartWallet,
+		Network:     dual.Network,
+		Created:     true,
+	}, nil
 }
 
 // =============================================================================
