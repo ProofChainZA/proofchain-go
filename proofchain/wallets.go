@@ -404,3 +404,234 @@ func (w *WalletClient) AddNFT(ctx context.Context, walletID string, req *AddNFTR
 	}
 	return &nft, nil
 }
+
+// ---------------------------------------------------------------------------
+// Transaction History
+// ---------------------------------------------------------------------------
+
+// Transaction represents a single blockchain transaction
+type Transaction struct {
+	Hash      string `json:"hash"`
+	Type      string `json:"type"` // "sent" or "received"
+	From      string `json:"from"`
+	To        string `json:"to"`
+	Value     string `json:"value"`
+	Asset     string `json:"asset"`
+	Category  string `json:"category"`
+	BlockNum  string `json:"block_num"`
+	Timestamp string `json:"timestamp"`
+}
+
+// TransactionHistory contains transaction history for a wallet
+type TransactionHistory struct {
+	Address       string        `json:"address"`
+	Network       string        `json:"network"`
+	TotalSent     int           `json:"total_sent"`
+	TotalReceived int           `json:"total_received"`
+	Transactions  []Transaction `json:"transactions"`
+	Error         *string       `json:"error,omitempty"`
+}
+
+// GetTransactions returns transaction history for a wallet.
+func (w *WalletClient) GetTransactions(ctx context.Context, walletID string, limit, offset int) (*TransactionHistory, error) {
+	params := url.Values{}
+	if limit > 0 {
+		params.Set("limit", fmt.Sprintf("%d", limit))
+	}
+	if offset > 0 {
+		params.Set("offset", fmt.Sprintf("%d", offset))
+	}
+
+	path := "/wallets/" + walletID + "/transactions"
+	if len(params) > 0 {
+		path += "?" + params.Encode()
+	}
+
+	var history TransactionHistory
+	err := w.http.Get(ctx, path, nil, &history)
+	if err != nil {
+		return nil, err
+	}
+	return &history, nil
+}
+
+// ---------------------------------------------------------------------------
+// Users With Wallets
+// ---------------------------------------------------------------------------
+
+// UserWithWallets represents a user and their wallets
+type UserWithWallets struct {
+	UserID  string   `json:"user_id"`
+	Wallets []Wallet `json:"wallets"`
+}
+
+// UsersWithWalletsResponse is a paginated list of users with wallets
+type UsersWithWalletsResponse struct {
+	Users  []UserWithWallets `json:"users"`
+	Total  int               `json:"total"`
+	Limit  int               `json:"limit"`
+	Offset int               `json:"offset"`
+}
+
+// ListUsersWithWallets returns all users who have wallets, grouped by user_id.
+func (w *WalletClient) ListUsersWithWallets(ctx context.Context, limit, offset int) (*UsersWithWalletsResponse, error) {
+	path := fmt.Sprintf("/wallets/users-with-wallets?limit=%d&offset=%d", limit, offset)
+
+	var response UsersWithWalletsResponse
+	err := w.http.Get(ctx, path, nil, &response)
+	if err != nil {
+		return nil, err
+	}
+	return &response, nil
+}
+
+// ---------------------------------------------------------------------------
+// Token Management
+// ---------------------------------------------------------------------------
+
+// Token represents a registered token (native, ERC-20, or custom)
+type Token struct {
+	ID              string  `json:"id"`
+	ContractAddress string  `json:"contract_address"`
+	Network         string  `json:"network"`
+	Symbol          string  `json:"symbol"`
+	Name            string  `json:"name"`
+	Decimals        int     `json:"decimals"`
+	LogoURL         *string `json:"logo_url,omitempty"`
+	Color           *string `json:"color,omitempty"`
+	CoingeckoID     *string `json:"coingecko_id,omitempty"`
+	CoinmarketcapID *string `json:"coinmarketcap_id,omitempty"`
+	TokenStandard   string  `json:"token_standard"`
+	IsNativeWrapper bool    `json:"is_native_wrapper"`
+	IsVerified      bool    `json:"is_verified"`
+	IsActive        bool    `json:"is_active"`
+	IsHidden        *bool   `json:"is_hidden,omitempty"`
+	DisplayOrder    int     `json:"display_order"`
+	IsGlobal        bool    `json:"is_global"`
+}
+
+// CreateTokenRequest registers a custom token for the tenant
+type CreateTokenRequest struct {
+	ContractAddress    string  `json:"contract_address"`
+	Network            string  `json:"network"`
+	Symbol             string  `json:"symbol"`
+	Name               string  `json:"name"`
+	Decimals           *int    `json:"decimals,omitempty"`
+	LogoURL            *string `json:"logo_url,omitempty"`
+	Color              *string `json:"color,omitempty"`
+	CoingeckoID        *string `json:"coingecko_id,omitempty"`
+	CoinmarketcapID    *string `json:"coinmarketcap_id,omitempty"`
+	CustomPriceFeedURL *string `json:"custom_price_feed_url,omitempty"`
+	IsNativeWrapper    *bool   `json:"is_native_wrapper,omitempty"`
+	DisplayOrder       *int    `json:"display_order,omitempty"`
+}
+
+// UpdateTokenRequest updates a custom token
+type UpdateTokenRequest struct {
+	Symbol             *string `json:"symbol,omitempty"`
+	Name               *string `json:"name,omitempty"`
+	Decimals           *int    `json:"decimals,omitempty"`
+	LogoURL            *string `json:"logo_url,omitempty"`
+	Color              *string `json:"color,omitempty"`
+	CoingeckoID        *string `json:"coingecko_id,omitempty"`
+	CoinmarketcapID    *string `json:"coinmarketcap_id,omitempty"`
+	CustomPriceFeedURL *string `json:"custom_price_feed_url,omitempty"`
+	IsActive           *bool   `json:"is_active,omitempty"`
+	IsHidden           *bool   `json:"is_hidden,omitempty"`
+	DisplayOrder       *int    `json:"display_order,omitempty"`
+}
+
+// ListTokensOptions configures the ListTokens query
+type ListTokensOptions struct {
+	Network       string
+	IncludeGlobal *bool
+	IncludeHidden *bool
+}
+
+// CreateToken registers a custom token for the tenant.
+func (w *WalletClient) CreateToken(ctx context.Context, req *CreateTokenRequest) (*Token, error) {
+	var token Token
+	err := w.http.Post(ctx, "/tokens", req, &token)
+	if err != nil {
+		return nil, err
+	}
+	return &token, nil
+}
+
+// ListTokens returns all tokens available to the tenant.
+func (w *WalletClient) ListTokens(ctx context.Context, opts *ListTokensOptions) ([]Token, error) {
+	params := url.Values{}
+	if opts != nil {
+		if opts.Network != "" {
+			params.Set("network", opts.Network)
+		}
+		if opts.IncludeGlobal != nil {
+			params.Set("include_global", fmt.Sprintf("%t", *opts.IncludeGlobal))
+		}
+		if opts.IncludeHidden != nil {
+			params.Set("include_hidden", fmt.Sprintf("%t", *opts.IncludeHidden))
+		}
+	}
+
+	path := "/tokens"
+	if len(params) > 0 {
+		path += "?" + params.Encode()
+	}
+
+	var tokens []Token
+	err := w.http.Get(ctx, path, nil, &tokens)
+	return tokens, err
+}
+
+// ListGlobalTokens returns well-known tokens available to all tenants.
+func (w *WalletClient) ListGlobalTokens(ctx context.Context, network string) ([]Token, error) {
+	path := "/tokens/global"
+	if network != "" {
+		path += "?network=" + url.QueryEscape(network)
+	}
+
+	var tokens []Token
+	err := w.http.Get(ctx, path, nil, &tokens)
+	return tokens, err
+}
+
+// GetToken returns a specific token by ID.
+func (w *WalletClient) GetToken(ctx context.Context, tokenID string) (*Token, error) {
+	var token Token
+	err := w.http.Get(ctx, "/tokens/"+tokenID, nil, &token)
+	if err != nil {
+		return nil, err
+	}
+	return &token, nil
+}
+
+// GetTokenByContract returns a token by contract address and network.
+func (w *WalletClient) GetTokenByContract(ctx context.Context, contractAddress, network string) (*Token, error) {
+	path := fmt.Sprintf("/tokens/by-contract/%s?network=%s", contractAddress, url.QueryEscape(network))
+
+	var token Token
+	err := w.http.Get(ctx, path, nil, &token)
+	if err != nil {
+		return nil, err
+	}
+	return &token, nil
+}
+
+// UpdateToken updates a custom token.
+func (w *WalletClient) UpdateToken(ctx context.Context, tokenID string, req *UpdateTokenRequest) (*Token, error) {
+	var token Token
+	err := w.http.Patch(ctx, "/tokens/"+tokenID, req, &token)
+	if err != nil {
+		return nil, err
+	}
+	return &token, nil
+}
+
+// DeleteToken soft-deletes a custom token.
+func (w *WalletClient) DeleteToken(ctx context.Context, tokenID string) error {
+	var result struct {
+		Message string `json:"message"`
+		TokenID string `json:"token_id"`
+	}
+	return w.http.Request(ctx, "DELETE", "/tokens/"+tokenID, nil, &result)
+}
