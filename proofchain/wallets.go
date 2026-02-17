@@ -64,14 +64,17 @@ type NFT struct {
 
 // SwapQuote represents a token swap quote
 type SwapQuote struct {
-	FromToken    string `json:"from_token"`
-	ToToken      string `json:"to_token"`
-	FromAmount   string `json:"from_amount"`
-	ToAmount     string `json:"to_amount"`
-	ExchangeRate string `json:"exchange_rate"`
-	PriceImpact  string `json:"price_impact"`
-	GasEstimate  string `json:"gas_estimate"`
-	ExpiresAt    string `json:"expires_at"`
+	FromToken          string `json:"from_token"`
+	ToToken            string `json:"to_token"`
+	FromAmount         string `json:"from_amount"`
+	ToAmount           string `json:"to_amount"`
+	MinToAmount        string `json:"min_to_amount"`
+	ExchangeRate       string `json:"exchange_rate"`
+	QuoteID            string `json:"quote_id"`
+	SlippageBps        int    `json:"slippage_bps"`
+	Network            string `json:"network"`
+	LiquidityAvailable bool   `json:"liquidity_available"`
+	ExpiresAt          string `json:"expires_at"`
 }
 
 // SwapResult represents a completed swap
