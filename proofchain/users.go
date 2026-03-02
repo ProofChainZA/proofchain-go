@@ -64,16 +64,21 @@ type UserActivityResponse struct {
 	RewardsPending int                      `json:"rewards_pending"`
 }
 
-// UserReward represents a single earned reward.
+// UserReward represents a single earned reward with display details.
 type UserReward struct {
 	ID            string   `json:"id"`
 	RewardName    string   `json:"reward_name"`
 	RewardType    string   `json:"reward_type"`
+	Slug          *string  `json:"slug,omitempty"`
+	Description   *string  `json:"description,omitempty"`
 	Value         *float64 `json:"value,omitempty"`
 	ValueCurrency *string  `json:"value_currency,omitempty"`
+	ImageURL      *string  `json:"image_url,omitempty"`
+	BadgeColor    *string  `json:"badge_color,omitempty"`
 	Status        string   `json:"status"`
 	EarnedAt      *string  `json:"earned_at,omitempty"`
 	DistributedAt *string  `json:"distributed_at,omitempty"`
+	ExpiresAt     *string  `json:"expires_at,omitempty"`
 	NFTTokenID    *int     `json:"nft_token_id,omitempty"`
 	NFTTxHash     *string  `json:"nft_tx_hash,omitempty"`
 }

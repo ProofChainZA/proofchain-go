@@ -105,6 +105,12 @@ type ListRewardsOptions struct {
 	Offset     int
 }
 
+// GetUserRewardsOptions are options for filtering a user's rewards
+type GetUserRewardsOptions struct {
+	Status     string
+	RewardType string
+}
+
 // RewardsClient provides reward operations
 type RewardsClient struct {
 	http *HTTPClient
@@ -217,11 +223,49 @@ func (r *RewardsClient) ListEarned(ctx context.Context, userID, definitionID, st
 	return rewards, err
 }
 
-// GetUserRewards returns earned rewards for a user
-func (r *RewardsClient) GetUserRewards(ctx context.Context, userID string) ([]EarnedReward, error) {
-	var rewards []EarnedReward
-	err := r.http.Get(ctx, "/rewards/earned/user/"+userID, nil, &rewards)
+// GetUserRewards returns earned rewards for a user with full display details.
+// Works with both API key and end-user JWT authentication.
+func (r *RewardsClient) GetUserRewards(ctx context.Context, userID string, opts *GetUserRewardsOptions) ([]UserReward, error) {
+	params := url.Values{}
+	if opts != nil {
+		if opts.Status != "" {
+			params.Set("status", opts.Status)
+		}
+		if opts.RewardType != "" {
+			params.Set("reward_type", opts.RewardType)
+		}
+	}
+	var rewards []UserReward
+	err := r.http.Get(ctx, "/rewards/users/"+userID+"/rewards", params, &rewards)
 	return rewards, err
+}
+
+// GetCatalog returns the public reward catalog (active, public definitions).
+// Works with both API key and end-user JWT authentication.
+func (r *RewardsClient) GetCatalog(ctx context.Context) ([]RewardDefinition, error) {
+	var definitions []RewardDefinition
+	err := r.http.Get(ctx, "/rewards/catalog", nil, &definitions)
+	return definitions, err
+}
+
+// ClaimRewardResult represents the result of claiming a lazy-mint NFT reward.
+type ClaimRewardResult struct {
+	Success       bool   `json:"success"`
+	RewardID      string `json:"reward_id"`
+	TokenID       *int   `json:"token_id,omitempty"`
+	TxHash        string `json:"tx_hash"`
+	WalletAddress string `json:"wallet_address"`
+}
+
+// ClaimReward claims a lazy-minted NFT reward, minting it to the specified wallet.
+// Works with both API key and end-user JWT authentication (scoped to own rewards).
+func (r *RewardsClient) ClaimReward(ctx context.Context, earnedRewardID, walletAddress string) (*ClaimRewardResult, error) {
+	var result ClaimRewardResult
+	err := r.http.Post(ctx, fmt.Sprintf("/rewards/earned/%s/claim?wallet_address=%s", earnedRewardID, url.QueryEscape(walletAddress)), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 // AwardManual manually awards rewards to users
