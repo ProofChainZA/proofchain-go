@@ -23,6 +23,8 @@ const (
 // HTTPClient handles HTTP requests to the ProofChain API.
 type HTTPClient struct {
 	apiKey     string
+	userToken  string // End-user JWT for JWKS auth (alternative to apiKey)
+	tenantID   string // Required when using userToken
 	baseURL    string
 	httpClient *http.Client
 	maxRetries int
@@ -56,6 +58,17 @@ func WithRetries(maxRetries int) HTTPClientOption {
 func WithHTTPClient(httpClient *http.Client) HTTPClientOption {
 	return func(c *HTTPClient) {
 		c.httpClient = httpClient
+	}
+}
+
+// WithUserToken configures end-user JWT authentication.
+// When set, requests use Authorization: Bearer <token> + X-Tenant-ID header
+// instead of X-API-Key. This is for PWA clients where API keys cannot be exposed.
+func WithUserToken(token, tenantID string) HTTPClientOption {
+	return func(c *HTTPClient) {
+		c.userToken = token
+		c.tenantID = tenantID
+		c.apiKey = "" // Clear API key when using user token
 	}
 }
 
@@ -132,7 +145,7 @@ func (c *HTTPClient) RequestMultipart(ctx context.Context, path string, fields m
 		return NewNetworkError(err)
 	}
 
-	req.Header.Set("X-API-Key", c.apiKey)
+	c.setAuthHeaders(req)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("User-Agent", userAgent)
 
@@ -159,11 +172,25 @@ func (c *HTTPClient) doRequest(ctx context.Context, method, path string, body in
 		return NewNetworkError(err)
 	}
 
-	req.Header.Set("X-API-Key", c.apiKey)
+	c.setAuthHeaders(req)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", userAgent)
 
 	return c.executeRequest(req, result)
+}
+
+// setAuthHeaders sets the appropriate authentication headers.
+func (c *HTTPClient) setAuthHeaders(req *http.Request) {
+	if c.userToken != "" {
+		// End-user JWKS JWT auth
+		req.Header.Set("Authorization", "Bearer "+c.userToken)
+		if c.tenantID != "" {
+			req.Header.Set("X-Tenant-ID", c.tenantID)
+		}
+	} else if c.apiKey != "" {
+		// Standard API key auth
+		req.Header.Set("X-API-Key", c.apiKey)
+	}
 }
 
 func (c *HTTPClient) executeRequest(req *http.Request, result interface{}) error {
@@ -291,7 +318,7 @@ func (c *HTTPClient) GetRaw(ctx context.Context, path string) ([]byte, error) {
 		return nil, NewNetworkError(err)
 	}
 
-	req.Header.Set("X-API-Key", c.apiKey)
+	c.setAuthHeaders(req)
 	req.Header.Set("User-Agent", userAgent)
 
 	resp, err := c.httpClient.Do(req)

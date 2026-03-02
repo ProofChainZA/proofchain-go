@@ -58,6 +58,25 @@ func NewClientFromEnv(opts ...HTTPClientOption) (*Client, error) {
 	return newClientFromHTTP(httpClient), nil
 }
 
+// NewEndUserClient creates a client authenticated with an end-user JWT.
+// This is for PWA/frontend clients where API keys cannot be safely exposed.
+// The userToken is a JWT from the client's own auth system (e.g., Auth0, Firebase, Cognito).
+// The tenantID is the Proofchain tenant slug or client_id.
+//
+// End-user clients have read-only access scoped to their own data:
+//   - Passports, milestones, leaderboards
+//   - User profile, activity, rewards
+//
+// Example:
+//
+//	client := proofchain.NewEndUserClient("eyJhbG...", "my-tenant-slug")
+//	passport, err := client.Passports.GetUserPassport(ctx, myUserID, nil)
+func NewEndUserClient(userToken, tenantID string, opts ...HTTPClientOption) *Client {
+	opts = append([]HTTPClientOption{WithUserToken(userToken, tenantID)}, opts...)
+	httpClient := NewHTTPClient("", opts...)
+	return newClientFromHTTP(httpClient)
+}
+
 func newClientFromHTTP(httpClient *HTTPClient) *Client {
 	c := &Client{
 		http: httpClient,
