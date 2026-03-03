@@ -55,6 +55,8 @@ type QuestStep struct {
 	Criteria           map[string]interface{} `json:"criteria,omitempty"`
 	RequiredDataFields []string               `json:"required_data_fields,omitempty"`
 	StepPoints         *int                   `json:"step_points,omitempty"`
+	CTAText            *string                `json:"cta_text,omitempty"`
+	CTAURL             *string                `json:"cta_url,omitempty"`
 	IconURL            *string                `json:"icon_url,omitempty"`
 	IsOptional         bool                   `json:"is_optional"`
 }
@@ -131,6 +133,8 @@ type CreateQuestStepRequest struct {
 	Criteria           map[string]interface{} `json:"criteria,omitempty"`
 	RequiredDataFields []string               `json:"required_data_fields,omitempty"`
 	StepPoints         *int                   `json:"step_points,omitempty"`
+	CTAText            *string                `json:"cta_text,omitempty"`
+	CTAURL             *string                `json:"cta_url,omitempty"`
 	IconURL            *string                `json:"icon_url,omitempty"`
 	IsOptional         bool                   `json:"is_optional,omitempty"`
 }
