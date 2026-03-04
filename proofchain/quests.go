@@ -33,6 +33,7 @@ type Quest struct {
 	RewardPoints          *int        `json:"reward_points,omitempty"`
 	IsPublic              bool        `json:"is_public"`
 	IsFeatured            bool        `json:"is_featured"`
+	DisplayOrder          int         `json:"display_order"`
 	Tags                  []string    `json:"tags"`
 	Status                string      `json:"status"`
 	Steps                 []QuestStep `json:"steps"`
@@ -119,6 +120,7 @@ type CreateQuestRequest struct {
 	RewardPoints          *int                     `json:"reward_points,omitempty"`
 	IsPublic              bool                     `json:"is_public,omitempty"`
 	IsFeatured            bool                     `json:"is_featured,omitempty"`
+	DisplayOrder          *int                     `json:"display_order,omitempty"`
 	Tags                  []string                 `json:"tags,omitempty"`
 	Steps                 []CreateQuestStepRequest `json:"steps"`
 }
