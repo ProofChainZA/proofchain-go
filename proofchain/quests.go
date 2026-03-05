@@ -33,7 +33,6 @@ type Quest struct {
 	RewardPoints          *int        `json:"reward_points,omitempty"`
 	IsPublic              bool        `json:"is_public"`
 	IsFeatured            bool        `json:"is_featured"`
-	DisplayOrder          int         `json:"display_order"`
 	Tags                  []string    `json:"tags"`
 	Status                string      `json:"status"`
 	Steps                 []QuestStep `json:"steps"`
@@ -85,6 +84,7 @@ type StepProgress struct {
 	StepName    string     `json:"step_name"`
 	Order       int        `json:"order"`
 	Status      string     `json:"status"`
+	StartedAt   *time.Time `json:"started_at,omitempty"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 	EventID     *string    `json:"event_id,omitempty"`
 }
@@ -120,7 +120,6 @@ type CreateQuestRequest struct {
 	RewardPoints          *int                     `json:"reward_points,omitempty"`
 	IsPublic              bool                     `json:"is_public,omitempty"`
 	IsFeatured            bool                     `json:"is_featured,omitempty"`
-	DisplayOrder          *int                     `json:"display_order,omitempty"`
 	Tags                  []string                 `json:"tags,omitempty"`
 	Steps                 []CreateQuestStepRequest `json:"steps"`
 }
@@ -148,6 +147,38 @@ type ListQuestsOptions struct {
 	IsFeatured *bool
 	Limit      int
 	Offset     int
+}
+
+// StepStartResult is returned when marking a step as in-progress
+type StepStartResult struct {
+	StepIndex int     `json:"step_index"`
+	Status    string  `json:"status"`
+	StartedAt *string `json:"started_at,omitempty"`
+	QuestID   string  `json:"quest_id"`
+	QuestName string  `json:"quest_name"`
+	StepName  string  `json:"step_name"`
+	Message   *string `json:"message,omitempty"`
+}
+
+// StepCompletionResult is returned when completing a step
+type StepCompletionResult struct {
+	StepIndex       int  `json:"step_index"`
+	StepCompleted   bool `json:"step_completed"`
+	QuestCompleted  bool `json:"quest_completed"`
+	RewardClaimable bool `json:"reward_claimable"`
+	CurrentCount    int  `json:"current_count"`
+	TargetCount     int  `json:"target_count"`
+	PointsEarned    int  `json:"points_earned"`
+}
+
+// QuestClaimResult is returned when claiming a quest reward
+type QuestClaimResult struct {
+	QuestID        string  `json:"quest_id"`
+	QuestName      string  `json:"quest_name"`
+	Status         string  `json:"status"`
+	PointsAwarded  int     `json:"points_awarded"`
+	RewardEarnedID *string `json:"reward_earned_id,omitempty"`
+	ClaimedAt      string  `json:"claimed_at"`
 }
 
 // QuestsClient provides quest operations
@@ -314,16 +345,36 @@ func (q *QuestsClient) GetUserProgress(ctx context.Context, questID, userID stri
 	return &progress, nil
 }
 
-// CompleteStep completes a step manually
-func (q *QuestsClient) CompleteStep(ctx context.Context, questID, userID, stepID string) (*UserQuestProgress, error) {
-	var progress UserQuestProgress
-	err := q.http.Post(ctx, "/quests/"+questID+"/steps/"+stepID+"/complete", map[string]interface{}{
-		"user_id": userID,
-	}, &progress)
+// StartStep marks a quest step as in-progress (started).
+// Call this when the user clicks a CTA link to begin a challenge.
+// Idempotent — safe to call multiple times for the same step.
+func (q *QuestsClient) StartStep(ctx context.Context, questID, userID string, stepIndex int) (*StepStartResult, error) {
+	var result StepStartResult
+	err := q.http.Post(ctx, fmt.Sprintf("/quests/%s/progress/%s/step/%d/start", questID, url.PathEscape(userID), stepIndex), nil, &result)
 	if err != nil {
 		return nil, err
 	}
-	return &progress, nil
+	return &result, nil
+}
+
+// CompleteStep completes a step manually by step index
+func (q *QuestsClient) CompleteStep(ctx context.Context, questID, userID string, stepIndex int) (*StepCompletionResult, error) {
+	var result StepCompletionResult
+	err := q.http.Post(ctx, fmt.Sprintf("/quests/%s/progress/%s/step/%d/complete", questID, url.PathEscape(userID), stepIndex), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ClaimReward claims a completed quest reward (for quests with reward_mode='claimable')
+func (q *QuestsClient) ClaimReward(ctx context.Context, questID, userID string) (*QuestClaimResult, error) {
+	var result QuestClaimResult
+	err := q.http.Post(ctx, fmt.Sprintf("/quests/%s/progress/%s/claim", questID, url.PathEscape(userID)), nil, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 // GetAllUserProgress returns all quest progress for a user
