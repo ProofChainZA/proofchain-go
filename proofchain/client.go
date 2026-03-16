@@ -42,6 +42,7 @@ type Client struct {
 	Cohorts        *CohortLeaderboardClient
 	Fanpass        *FanpassLeaderboardClient
 	Credentials    *CredentialsClient
+	PartnerKeys    *PartnerKeysClient
 }
 
 // NewClient creates a new ProofChain client.
@@ -102,6 +103,7 @@ func newClientFromHTTP(httpClient *HTTPClient) *Client {
 	c.Cohorts = NewCohortLeaderboardClient(httpClient)
 	c.Fanpass = NewFanpassLeaderboardClient(httpClient)
 	c.Credentials = NewCredentialsClient(httpClient)
+	c.PartnerKeys = NewPartnerKeysClient(httpClient)
 
 	return c
 }
