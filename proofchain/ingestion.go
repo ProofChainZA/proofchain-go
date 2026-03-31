@@ -156,6 +156,9 @@ func (c *IngestionClient) Ingest(ctx context.Context, req *IngestEventRequest) (
 		"data":         data,
 		"event_source": source,
 	}
+	if req.Timestamp != "" {
+		payload["timestamp"] = req.Timestamp
+	}
 
 	body, err := json.Marshal(payload)
 	if err != nil {
