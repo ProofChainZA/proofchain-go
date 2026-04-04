@@ -59,6 +59,7 @@ type IngestEventRequest struct {
 	EventSource string                 `json:"event_source,omitempty"`
 	Timestamp   string                 `json:"timestamp,omitempty"` // ISO8601/RFC3339 format
 	SchemaIDs   []string               `json:"-"`                   // Sent via header
+	Hot         bool                   `json:"hot,omitempty"`       // Immediate on-chain attestation
 }
 
 // IngestEventResponse is the response from ingesting an event.
@@ -159,6 +160,9 @@ func (c *IngestionClient) Ingest(ctx context.Context, req *IngestEventRequest) (
 	if req.Timestamp != "" {
 		payload["timestamp"] = req.Timestamp
 	}
+	if req.Hot {
+		payload["hot"] = true
+	}
 
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -245,6 +249,9 @@ func (c *IngestionClient) IngestBatch(ctx context.Context, req *BatchIngestReque
 		}
 		if e.Timestamp != "" {
 			event["timestamp"] = e.Timestamp
+		}
+		if e.Hot {
+			event["hot"] = true
 		}
 		events[i] = event
 	}
