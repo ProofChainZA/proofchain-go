@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -13,6 +14,24 @@ import (
 	"strconv"
 	"time"
 )
+
+// parseRetryAfter interprets a Retry-After header per RFC 7231.
+// Supports both delta-seconds ("120") and HTTP-date formats.
+// Returns 0 if empty, negative, or unparseable.
+func parseRetryAfter(v string) int {
+	if v == "" {
+		return 0
+	}
+	if n, err := strconv.Atoi(v); err == nil && n > 0 {
+		return n
+	}
+	if t, err := http.ParseTime(v); err == nil {
+		if d := int(time.Until(t).Seconds()); d > 0 {
+			return d
+		}
+	}
+	return 0
+}
 
 const (
 	defaultBaseURL = "https://api.proofchain.co.za"
@@ -214,14 +233,21 @@ func (c *HTTPClient) executeRequest(req *http.Request, result interface{}) error
 		}
 
 		if err := c.handleResponse(resp.StatusCode, respBody, result); err != nil {
-			// Retry on rate limit
+			// Retry on rate limit — prefer the server's Retry-After header
+			// over the hardcoded 60s in handleResponse, and add jitter so a
+			// fleet of SDK clients doesn't retry in lockstep.
 			if rateLimitErr, ok := err.(*RateLimitError); ok && attempt < c.maxRetries {
-				sleepDuration := time.Duration(rateLimitErr.RetryAfter) * time.Second
+				secs := parseRetryAfter(resp.Header.Get("Retry-After"))
+				if secs <= 0 {
+					secs = rateLimitErr.RetryAfter
+				}
+				sleepDuration := time.Duration(secs) * time.Second
 				if sleepDuration > 60*time.Second {
 					sleepDuration = 60 * time.Second
 				}
 				if sleepDuration > 0 {
-					time.Sleep(sleepDuration)
+					jitter := time.Duration(rand.Intn(1000)) * time.Millisecond
+					time.Sleep(sleepDuration + jitter)
 				}
 				lastErr = err
 				continue
