@@ -6,7 +6,18 @@ import (
 	"testing"
 )
 
+// skipUnlessLive skips the calling test unless PROOFCHAIN_LIVE_TESTS=1 is set,
+// since these tests dial a live ProofChain API instead of using mocks.
+func skipUnlessLive(t *testing.T) {
+	t.Helper()
+	if os.Getenv("PROOFCHAIN_LIVE_TESTS") == "" {
+		t.Skip("live-API test; set PROOFCHAIN_LIVE_TESTS=1")
+	}
+}
+
 func getTestClient(t *testing.T) *Client {
+	t.Helper()
+	skipUnlessLive(t)
 	apiKey := os.Getenv("PROOFCHAIN_API_KEY")
 	if apiKey == "" {
 		apiKey = "atst_d68b397e80587a87d5a5bd11160f400d9dfdd62e913315ec7b2b440a73609be0"
