@@ -1,0 +1,95 @@
+name: Claude Doc Sync
+
+# Automatic documentation pipeline (oh-my-claudecode layered docs, Layer 2 + 3):
+#  - pr-doc-sync: on every PR, Claude reads the diff and updates stale docs in the same PR
+#  - nightly-doc-sweep: nightly drift-catching audit that opens/updates a docs PR for
+#    anything missed (skips the LLM call entirely on quiet nights with no new commits)
+#
+# Requirements:
+#  - Repo/org secret ANTHROPIC_API_KEY (or run /install-github-app from Claude Code)
+#  - Actions enabled with workflow write permissions
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  schedule:
+    - cron: "0 6 * * *" # nightly 06:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: doc-sync-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-doc-sync:
+    if: >
+      github.event_name == 'pull_request' &&
+      !contains(github.event.pull_request.title, '[skip-docs]') &&
+      github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review the diff of this pull request against its base branch
+            (git diff origin/${{ github.event.pull_request.base.ref }}...HEAD).
+
+            Identify documentation that the code changes make stale or that new code
+            leaves missing: README.md, docs/, CLAUDE.md, AGENTS.md, API references,
+            environment variable tables, CLI usage, setup instructions.
+
+            Update ONLY documentation files to accurately reflect the code changes.
+            Do not modify source code, tests, or CI config. Do not invent features.
+            If documentation is already accurate, make no changes and stop.
+
+            If you made changes, commit them to the current branch with the message
+            "docs: sync documentation with PR changes".
+          claude_args: "--max-turns 15 --model claude-sonnet-5"
+
+  nightly-doc-sweep:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for commits in the last 24h
+        id: check
+        run: |
+          count=$(git log --since="24 hours ago" --oneline | wc -l)
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.check.outputs.count != '0' || github.event_name == 'workflow_dispatch'
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Audit this repository's documentation against the current code.
+
+            1. Review commits from the last 24 hours (git log --since="24 hours ago" --stat).
+            2. Check README.md, docs/, CLAUDE.md, and AGENTS.md for statements that no
+               longer match the code: commands, env vars, endpoints, architecture,
+               setup steps. Also note significant new modules with no documentation.
+            3. Fix what you find: update stale sections, add brief docs for undocumented
+               modules, remove references to deleted code. Preserve any
+               "<!-- MANUAL: -->" sections verbatim.
+            4. If you made changes, create or update a branch named docs/nightly-sync,
+               commit with "docs: nightly documentation sweep", and open (or update)
+               a pull request from it using `gh pr create` / `gh pr edit`.
+            5. If everything is accurate, make no changes.
+          claude_args: "--max-turns 30 --model claude-sonnet-5"
