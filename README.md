@@ -2,6 +2,15 @@
 
 Official Go SDK for [ProofChain](https://proofchain.co.za) - blockchain-anchored document attestation.
 
+> New to the ProofChain platform? Start with
+> `proofchain-infra/docs/ONBOARDING.md`, then
+> `proofchain-infra/docs/ARCHITECTURE.md`.
+>
+> **This repo holds two Go modules** and the root is not the one with the code.
+> Run `go build` / `go test` from inside `proofchain/` — `go build ./examples/...`
+> from the root fails, because examples import the nested module path that the
+> root `go.mod` neither requires nor replaces. See `CLAUDE.md`.
+
 ## Installation
 
 ```bash
