@@ -41,6 +41,7 @@ type Client struct {
 	DataViews      *DataViewsClient
 	Cohorts        *CohortLeaderboardClient
 	Fanpass        *FanpassLeaderboardClient
+	FanScoreProfiles *FanScoreProfilesClient
 	Credentials    *CredentialsClient
 	PartnerKeys    *PartnerKeysClient
 }
@@ -102,6 +103,7 @@ func newClientFromHTTP(httpClient *HTTPClient) *Client {
 	c.DataViews = NewDataViewsClient(httpClient)
 	c.Cohorts = NewCohortLeaderboardClient(httpClient)
 	c.Fanpass = NewFanpassLeaderboardClient(httpClient)
+	c.FanScoreProfiles = NewFanScoreProfilesClient(httpClient)
 	c.Credentials = NewCredentialsClient(httpClient)
 	c.PartnerKeys = NewPartnerKeysClient(httpClient)
 
