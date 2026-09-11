@@ -3,8 +3,10 @@ package proofchain
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 )
 
@@ -111,6 +113,126 @@ func TestFanScoreProfilesGetProfile(t *testing.T) {
 				t.Errorf("profile.slug = %q, want %q", profile.Profile.Slug, "vip")
 			}
 		})
+	}
+}
+
+// fanScoreBatchReply pairs a resolved reference with one that resolved to no
+// fan: null in profiles and listed in not_found.
+const fanScoreMissingRef = "wallet:0xAbC0000000000000000000000000000000000009"
+const fanScoreBatchReply = `{
+  "profiles": {
+    "acme-42": ` + fanScoreEnvelope + `,
+    "` + fanScoreMissingRef + `": null
+  },
+  "not_found": ["` + fanScoreMissingRef + `"]
+}`
+
+func TestFanScoreProfilesGetProfiles(t *testing.T) {
+	tests := []struct {
+		name     string
+		profile  string
+		wantPath string
+	}{
+		{name: "empty profile falls back to default", wantPath: "/fanscore/profiles/default/fans"},
+		{name: "named profile", profile: "vip", wantPath: "/fanscore/profiles/vip/fans"},
+		{name: "profile name with a space is escaped", profile: "match day", wantPath: "/fanscore/profiles/match%20day/fans"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotMethod, gotEscaped, gotQuery, gotAPIKey, gotContentType string
+			var gotBody struct {
+				FanRefs []string `json:"fan_refs"`
+			}
+			client := newFanScoreClient(t, "tenant-key", func(w http.ResponseWriter, r *http.Request) {
+				gotMethod, gotEscaped = r.Method, r.URL.EscapedPath()
+				gotQuery, gotAPIKey = r.URL.RawQuery, r.Header.Get("X-API-Key")
+				gotContentType = r.Header.Get("Content-Type")
+				if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+					t.Errorf("decoding the request body failed: %v", err)
+				}
+				_, _ = w.Write([]byte(fanScoreBatchReply))
+			})
+
+			refs := []string{"acme-42", fanScoreMissingRef}
+			batch, err := client.GetProfiles(context.Background(), refs, tt.profile)
+			if err != nil {
+				t.Fatalf("GetProfiles failed: %v", err)
+			}
+			if gotMethod != http.MethodPost {
+				t.Errorf("method = %q, want %q", gotMethod, http.MethodPost)
+			}
+			if gotEscaped != tt.wantPath {
+				t.Errorf("escaped path = %q, want %q", gotEscaped, tt.wantPath)
+			}
+			if gotQuery != "" {
+				t.Errorf("query = %q, want empty", gotQuery)
+			}
+			if gotAPIKey != "tenant-key" {
+				t.Errorf("X-API-Key = %q, want %q", gotAPIKey, "tenant-key")
+			}
+			if gotContentType != "application/json" {
+				t.Errorf("Content-Type = %q, want application/json", gotContentType)
+			}
+			if len(gotBody.FanRefs) != 2 || gotBody.FanRefs[0] != "acme-42" || gotBody.FanRefs[1] != fanScoreMissingRef {
+				t.Errorf("body fan_refs = %v, want %v sent verbatim and in order", gotBody.FanRefs, refs)
+			}
+
+			if len(batch.Profiles) != 2 {
+				t.Fatalf("profiles = %v, want one entry per reference sent", batch.Profiles)
+			}
+			found := batch.Profiles["acme-42"]
+			if found == nil {
+				t.Fatal("profiles[acme-42] is nil, want the decoded envelope")
+			}
+			if found.Profile.Slug != "vip" || found.Score == nil || found.Score.Composite == nil || *found.Score.Composite != 1284.5 {
+				t.Errorf("profiles[acme-42] = %+v, want the vip envelope scoring 1284.5", found)
+			}
+			if found.Rank != nil {
+				t.Errorf("profiles[acme-42].rank = %v, want nil for a null block", found.Rank)
+			}
+			missing, ok := batch.Profiles[fanScoreMissingRef]
+			if !ok {
+				t.Fatalf("profiles is missing the %q key; a null entry must still be keyed", fanScoreMissingRef)
+			}
+			if missing != nil {
+				t.Errorf("profiles[%q] = %+v, want nil for a reference that resolved to no fan", fanScoreMissingRef, missing)
+			}
+			if len(batch.NotFound) != 1 || batch.NotFound[0] != fanScoreMissingRef {
+				t.Errorf("not_found = %v, want [%q]", batch.NotFound, fanScoreMissingRef)
+			}
+		})
+	}
+}
+
+func TestFanScoreProfilesGetProfilesRejectsOversizeBatch(t *testing.T) {
+	called := false
+	client := newFanScoreClient(t, "tenant-key", func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		_, _ = w.Write([]byte(fanScoreBatchReply))
+	})
+
+	refs := make([]string, MaxFanScoreProfileBatch+1)
+	for i := range refs {
+		refs[i] = "acme-" + strconv.Itoa(i)
+	}
+	batch, err := client.GetProfiles(context.Background(), refs, "vip")
+	if batch != nil {
+		t.Errorf("batch = %v, want nil when the cap is exceeded", batch)
+	}
+	var validation *ValidationError
+	if !errors.As(err, &validation) {
+		t.Fatalf("err = %v (%T), want a *ValidationError", err, err)
+	}
+	if called {
+		t.Error("an oversize batch reached the server; it must be refused before sending")
+	}
+
+	refs = refs[:MaxFanScoreProfileBatch]
+	if _, err := client.GetProfiles(context.Background(), refs, "vip"); err != nil {
+		t.Fatalf("a batch exactly at the cap failed: %v", err)
+	}
+	if !called {
+		t.Error("a batch exactly at the cap was not sent")
 	}
 }
 

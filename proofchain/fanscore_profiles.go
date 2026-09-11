@@ -3,6 +3,7 @@ package proofchain
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/url"
 )
 
@@ -169,6 +170,22 @@ type FanScoreProfileDefinition struct {
 	UpdatedAt    *string                `json:"updated_at,omitempty"`
 }
 
+// MaxFanScoreProfileBatch is the most fan references one GetProfiles call may
+// carry. The server rejects a larger body with a 422; this client refuses it
+// before the request leaves.
+const MaxFanScoreProfileBatch = 100
+
+// FanScoreProfileBatch is the reply to a batch read.
+//
+// Profiles is keyed by the fan reference exactly as it was sent — the server
+// neither normalises the reference nor guarantees any order. A nil value and
+// membership in NotFound say the same thing: that reference resolved to no
+// fan, which is an answer rather than an error.
+type FanScoreProfileBatch struct {
+	Profiles map[string]*FanScoreProfile `json:"profiles"`
+	NotFound []string                    `json:"not_found"`
+}
+
 // FanScoreProfilesClient reads FanScore Profiles — the tenant-configurable
 // fan object. A fan reference is a fan_id UUID, the tenant's external_id,
 // "wallet:0x…" or "email:…" (email is never accepted on the public endpoint).
@@ -189,6 +206,32 @@ func (f *FanScoreProfilesClient) GetProfile(ctx context.Context, fanRef, profile
 	}
 	var out FanScoreProfile
 	if err := f.http.Get(ctx, "/fanscore/profiles/"+url.PathEscape(profile)+"/fans/"+url.PathEscape(fanRef), nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetProfiles returns up to MaxFanScoreProfileBatch fans' objects in one
+// request, so a page rendering many fans costs one round trip instead of one
+// per fan. profile "" means the tenant's default, and the credential rules
+// are GetProfile's.
+//
+// The references travel verbatim in the JSON body, so no path escaping
+// applies, and the reply is keyed by the reference as sent: a nil profile
+// (also listed in NotFound) means that reference resolved to no fan. More
+// than MaxFanScoreProfileBatch references is a ValidationError raised before
+// the request is sent; split larger sets yourself so the pacing stays yours.
+func (f *FanScoreProfilesClient) GetProfiles(ctx context.Context, fanRefs []string, profile string) (*FanScoreProfileBatch, error) {
+	if len(fanRefs) > MaxFanScoreProfileBatch {
+		return nil, NewValidationError(
+			fmt.Sprintf("batch size cannot exceed %d fan refs", MaxFanScoreProfileBatch), nil)
+	}
+	if profile == "" {
+		profile = "default"
+	}
+	body := map[string]interface{}{"fan_refs": fanRefs}
+	var out FanScoreProfileBatch
+	if err := f.http.Post(ctx, "/fanscore/profiles/"+url.PathEscape(profile)+"/fans", body, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
