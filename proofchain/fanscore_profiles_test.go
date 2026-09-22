@@ -279,31 +279,60 @@ func TestFanScoreProfilesGetMyProfile(t *testing.T) {
 	}
 }
 
+// TestFanScoreProfilesGetPublicProfile checks the public route never carries
+// a credential, whichever kind the client was configured with: the route is
+// anonymous, so a leaked key buys nothing and exposes it to an edge cache.
+// X-Tenant-ID is not a credential and still travels, because a shared host
+// needs it to find the tenant.
 func TestFanScoreProfilesGetPublicProfile(t *testing.T) {
-	var gotPath, gotEscaped, gotQuery, gotAPIKey, gotAuth string
-	client := newFanScoreClient(t, "", func(w http.ResponseWriter, r *http.Request) {
-		gotPath, gotEscaped = r.URL.Path, r.URL.EscapedPath()
-		gotQuery = r.URL.RawQuery
-		gotAPIKey, gotAuth = r.Header.Get("X-API-Key"), r.Header.Get("Authorization")
-		_, _ = w.Write([]byte(fanScoreEnvelope))
-	})
-
+	tests := []struct {
+		name       string
+		apiKey     string
+		opts       []HTTPClientOption
+		wantTenant string
+	}{
+		{name: "unauthenticated client", apiKey: ""},
+		{name: "api key client", apiKey: "pk_live_secret"},
+		{name: "user token client", opts: []HTTPClientOption{WithUserToken("jwt-abc", "tenant-1")}, wantTenant: "tenant-1"},
+	}
 	const fanRef = "wallet:0xAbC0000000000000000000000000000000000001"
-	if _, err := client.GetPublicProfile(context.Background(), "showcase", fanRef); err != nil {
-		t.Fatalf("GetPublicProfile failed: %v", err)
-	}
-	wantPath := "/fanscore/public/showcase/fans/" + fanRef
-	if gotPath != wantPath {
-		t.Errorf("path = %q, want %q", gotPath, wantPath)
-	}
-	if gotEscaped != wantPath {
-		t.Errorf("escaped path = %q, want %q", gotEscaped, wantPath)
-	}
-	if gotQuery != "" {
-		t.Errorf("query = %q, want empty", gotQuery)
-	}
-	if gotAPIKey != "" || gotAuth != "" {
-		t.Errorf("public read sent credentials: X-API-Key=%q Authorization=%q", gotAPIKey, gotAuth)
+	const wantPath = "/fanscore/public/showcase/fans/" + fanRef
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotPath, gotEscaped, gotQuery string
+			var gotHeaders http.Header
+			client := newFanScoreClient(t, tt.apiKey, func(w http.ResponseWriter, r *http.Request) {
+				gotPath, gotEscaped = r.URL.Path, r.URL.EscapedPath()
+				gotQuery = r.URL.RawQuery
+				gotHeaders = r.Header.Clone()
+				_, _ = w.Write([]byte(fanScoreEnvelope))
+			}, tt.opts...)
+
+			got, err := client.GetPublicProfile(context.Background(), fanRef, "showcase")
+			if err != nil {
+				t.Fatalf("GetPublicProfile failed: %v", err)
+			}
+			if got.Profile.Slug != "vip" {
+				t.Errorf("envelope not decoded: profile.slug = %q", got.Profile.Slug)
+			}
+			if gotPath != wantPath {
+				t.Errorf("path = %q, want %q", gotPath, wantPath)
+			}
+			if gotEscaped != wantPath {
+				t.Errorf("escaped path = %q, want %q", gotEscaped, wantPath)
+			}
+			if gotQuery != "" {
+				t.Errorf("query = %q, want empty", gotQuery)
+			}
+			for _, h := range []string{"X-API-Key", "Authorization"} {
+				if v := gotHeaders.Get(h); v != "" {
+					t.Errorf("public read sent credential header %s=%q", h, v)
+				}
+			}
+			if got := gotHeaders.Get("X-Tenant-ID"); got != tt.wantTenant {
+				t.Errorf("X-Tenant-ID = %q, want %q", got, tt.wantTenant)
+			}
+		})
 	}
 }
 

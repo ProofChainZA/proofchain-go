@@ -250,10 +250,13 @@ func (f *FanScoreProfilesClient) GetMyProfile(ctx context.Context, profile strin
 	return &out, nil
 }
 
-// GetPublicProfile returns a public profile for a fan; no credential required.
-func (f *FanScoreProfilesClient) GetPublicProfile(ctx context.Context, profile, fanRef string) (*FanScoreProfile, error) {
+// GetPublicProfile returns a fan's object through a profile the tenant
+// published at audience public. The route takes no credential, so none is
+// sent even when this client holds one: the tenant is resolved from the host.
+// Argument order matches GetProfile; there is no default profile here.
+func (f *FanScoreProfilesClient) GetPublicProfile(ctx context.Context, fanRef, profile string) (*FanScoreProfile, error) {
 	var out FanScoreProfile
-	if err := f.http.Get(ctx, "/fanscore/public/"+url.PathEscape(profile)+"/fans/"+url.PathEscape(fanRef), nil, &out); err != nil {
+	if err := f.http.GetAnonymous(ctx, "/fanscore/public/"+url.PathEscape(profile)+"/fans/"+url.PathEscape(fanRef), nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
