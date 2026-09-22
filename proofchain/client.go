@@ -23,26 +23,27 @@ type Client struct {
 	http *HTTPClient
 
 	// Resource managers
-	Documents      *DocumentsResource
-	Events         *EventsResource
-	Channels       *ChannelsResource
-	Certificates   *CertificatesResource
-	Webhooks       *WebhooksResource
-	Vault          *VaultResource
-	Search         *SearchResource
-	VerifyResource *VerifyResource
-	Tenant         *TenantResource
-	Passports      *PassportClient
-	Wallets        *WalletClient
-	Users          *EndUsersClient
-	Rewards        *RewardsClient
-	Quests         *QuestsClient
-	Schemas        *SchemasClient
-	DataViews      *DataViewsClient
-	Cohorts        *CohortLeaderboardClient
-	Fanpass        *FanpassLeaderboardClient
-	Credentials    *CredentialsClient
-	PartnerKeys    *PartnerKeysClient
+	Documents        *DocumentsResource
+	Events           *EventsResource
+	Channels         *ChannelsResource
+	Certificates     *CertificatesResource
+	Webhooks         *WebhooksResource
+	Vault            *VaultResource
+	Search           *SearchResource
+	VerifyResource   *VerifyResource
+	Tenant           *TenantResource
+	Passports        *PassportClient
+	Wallets          *WalletClient
+	Users            *EndUsersClient
+	Rewards          *RewardsClient
+	Quests           *QuestsClient
+	Schemas          *SchemasClient
+	DataViews        *DataViewsClient
+	Cohorts          *CohortLeaderboardClient
+	Fanpass          *FanpassLeaderboardClient
+	FanScoreProfiles *FanScoreProfilesClient
+	Credentials      *CredentialsClient
+	PartnerKeys      *PartnerKeysClient
 }
 
 // NewClient creates a new ProofChain client.
@@ -102,6 +103,7 @@ func newClientFromHTTP(httpClient *HTTPClient) *Client {
 	c.DataViews = NewDataViewsClient(httpClient)
 	c.Cohorts = NewCohortLeaderboardClient(httpClient)
 	c.Fanpass = NewFanpassLeaderboardClient(httpClient)
+	c.FanScoreProfiles = NewFanScoreProfilesClient(httpClient)
 	c.Credentials = NewCredentialsClient(httpClient)
 	c.PartnerKeys = NewPartnerKeysClient(httpClient)
 

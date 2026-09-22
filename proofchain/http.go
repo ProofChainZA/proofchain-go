@@ -126,12 +126,12 @@ func NewHTTPClientFromEnv(opts ...HTTPClientOption) (*HTTPClient, error) {
 
 // Request makes an HTTP request to the API.
 func (c *HTTPClient) Request(ctx context.Context, method, path string, body interface{}, result interface{}) error {
-	return c.doRequest(ctx, method, path, body, nil, result)
+	return c.doRequest(ctx, method, path, body, nil, result, true)
 }
 
 // RequestWithParams makes an HTTP request with query parameters.
 func (c *HTTPClient) RequestWithParams(ctx context.Context, method, path string, params url.Values, result interface{}) error {
-	return c.doRequest(ctx, method, path, nil, params, result)
+	return c.doRequest(ctx, method, path, nil, params, result, true)
 }
 
 // RequestMultipart makes a multipart form request.
@@ -171,7 +171,9 @@ func (c *HTTPClient) RequestMultipart(ctx context.Context, path string, fields m
 	return c.executeRequest(req, result)
 }
 
-func (c *HTTPClient) doRequest(ctx context.Context, method, path string, body interface{}, params url.Values, result interface{}) error {
+// doRequest builds and executes a JSON request. authenticated false leaves the
+// configured credential off the wire, for routes that serve anonymous callers.
+func (c *HTTPClient) doRequest(ctx context.Context, method, path string, body interface{}, params url.Values, result interface{}, authenticated bool) error {
 	fullURL := c.baseURL + path
 	if len(params) > 0 {
 		fullURL += "?" + params.Encode()
@@ -191,7 +193,13 @@ func (c *HTTPClient) doRequest(ctx context.Context, method, path string, body in
 		return NewNetworkError(err)
 	}
 
-	c.setAuthHeaders(req)
+	if authenticated {
+		c.setAuthHeaders(req)
+	} else if c.tenantID != "" {
+		// X-Tenant-ID names the tenant, it does not prove anything; an
+		// anonymous route on a shared host still needs it to find the tenant.
+		req.Header.Set("X-Tenant-ID", c.tenantID)
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", userAgent)
 
@@ -315,6 +323,13 @@ func (c *HTTPClient) handleResponse(statusCode int, body []byte, result interfac
 // Get makes a GET request.
 func (c *HTTPClient) Get(ctx context.Context, path string, params url.Values, result interface{}) error {
 	return c.RequestWithParams(ctx, http.MethodGet, path, params, result)
+}
+
+// GetAnonymous makes a GET request without credentials. Use it for routes
+// that answer the public, so a client configured with an API key or user
+// token does not hand it to an endpoint that never asked for it.
+func (c *HTTPClient) GetAnonymous(ctx context.Context, path string, params url.Values, result interface{}) error {
+	return c.doRequest(ctx, http.MethodGet, path, nil, params, result, false)
 }
 
 // Post makes a POST request.
