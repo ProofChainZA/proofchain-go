@@ -5,12 +5,20 @@ name: Claude Doc Sync
 #  - nightly-doc-sweep: nightly drift-catching audit that opens/updates a docs PR for
 #    anything missed (skips the LLM call entirely on quiet nights with no new commits)
 #
-# Runs against Moonshot's Kimi K2 via its Anthropic-compatible endpoint (subscription
-# billing via Kimi Code, not per-token Anthropic billing) - see ANTHROPIC_BASE_URL below.
+# Runs against Anthropic's API directly (per-token billing). It previously ran on
+# Moonshot's Kimi via an Anthropic-compatible endpoint; that is gone, so there is no
+# ANTHROPIC_BASE_URL / ANTHROPIC_MODEL override here — the action talks to Anthropic
+# by default.
 #
 # Requirements:
-#  - Repo/org secret KIMI_API_KEY (minted from the Kimi Code console)
+#  - Repo secret CLAUDE_CODE_OAUTH_TOKEN (mint with `claude setup-token`, Max/Pro account)
 #  - Actions enabled with workflow write permissions
+#
+# github_token is passed explicitly to both jobs: without it the action tries to mint
+# a Claude GitHub App token via Anthropic's OIDC exchange and fails 401 with "Claude
+# Code is not installed on this repository". Passing the job's own GITHUB_TOKEN skips
+# that exchange; it already carries the contents/pull-requests write the jobs need.
+# (Installing github.com/apps/claude on the org would be the alternative fix.)
 
 on:
   pull_request:
@@ -40,12 +48,34 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
 
-      - uses: anthropics/claude-code-action@v1
+      # An empty or unset CLAUDE_CODE_OAUTH_TOKEN makes the action exit 1
+      # ("Either ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN, or workload
+      # identity federation ... is required"), which reds every PR in the repo
+      # for an optional doc bot. That is how proofchain-portal ran 6 days of
+      # failing PR checks. Skip loudly instead: the annotation says what to do,
+      # and a red check keeps meaning something.
+      - name: Check doc-sync credential
+        id: cred
         env:
-          ANTHROPIC_BASE_URL: https://api.kimi.com/coding/
-          ANTHROPIC_MODEL: k3
+          TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::CLAUDE_CODE_OAUTH_TOKEN is empty or unset - skipping doc sync. Mint one with 'claude setup-token', then 'gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo ${{ github.repository }}'."
+          fi
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.cred.outputs.present == 'true'
         with:
-          anthropic_api_key: ${{ secrets.KIMI_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # See the github_token note in the header: without this the action
+          # tries to mint a Claude GitHub App token via Anthropic's OIDC
+          # exchange and dies 401 ("Claude Code is not installed on this
+          # repository"). The API key authenticates the model; this
+          # authenticates GitHub.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: |
             Review the diff of this pull request against its base branch
             (git diff origin/${{ github.event.pull_request.base.ref }}...HEAD).
@@ -60,7 +90,7 @@ jobs:
 
             If you made changes, commit them to the current branch with the message
             "docs: sync documentation with PR changes".
-          claude_args: "--max-turns 15 --model k3"
+          claude_args: "--max-turns 15 --model claude-sonnet-5"
 
   nightly-doc-sweep:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -80,13 +110,33 @@ jobs:
           count=$(git log --since="24 hours ago" --oneline | wc -l)
           echo "count=$count" >> "$GITHUB_OUTPUT"
 
-      - uses: anthropics/claude-code-action@v1
-        if: steps.check.outputs.count != '0' || github.event_name == 'workflow_dispatch'
+      # An empty or unset CLAUDE_CODE_OAUTH_TOKEN makes the action exit 1
+      # ("Either ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN, or workload
+      # identity federation ... is required"), which reds every PR in the repo
+      # for an optional doc bot. That is how proofchain-portal ran 6 days of
+      # failing PR checks. Skip loudly instead: the annotation says what to do,
+      # and a red check keeps meaning something.
+      - name: Check doc-sync credential
+        id: cred
         env:
-          ANTHROPIC_BASE_URL: https://api.kimi.com/coding/
-          ANTHROPIC_MODEL: k3
+          TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::CLAUDE_CODE_OAUTH_TOKEN is empty or unset - skipping doc sync. Mint one with 'claude setup-token', then 'gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo ${{ github.repository }}'."
+          fi
+
+      - uses: anthropics/claude-code-action@v1
+        if: steps.cred.outputs.present == 'true' && (steps.check.outputs.count != '0' || github.event_name == 'workflow_dispatch')
         with:
-          anthropic_api_key: ${{ secrets.KIMI_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # See the note on the pr-doc-sync job above. Caveat for this job: a PR
+          # opened with GITHUB_TOKEN does not trigger other workflows, so the
+          # nightly docs PR gets no CI run — harmless here, since CI already
+          # path-ignores **.md.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: |
             Audit this repository's documentation against the current code.
 
@@ -101,4 +151,4 @@ jobs:
                commit with "docs: nightly documentation sweep", and open (or update)
                a pull request from it using `gh pr create` / `gh pr edit`.
             5. If everything is accurate, make no changes.
-          claude_args: "--max-turns 30 --model k3"
+          claude_args: "--max-turns 30 --model claude-sonnet-5"
