@@ -15,18 +15,26 @@ func skipUnlessLive(t *testing.T) {
 	}
 }
 
+// getTestClient returns a client for the live integration tests. They run
+// only when PROOFCHAIN_LIVE_TESTS=1 and PROOFCHAIN_API_KEY are set;
+// PROOFCHAIN_BASE_URL optionally overrides the API host (must be https:// or
+// loopback). No credential is ever embedded in the test source.
 func getTestClient(t *testing.T) *Client {
 	t.Helper()
 	skipUnlessLive(t)
 	apiKey := os.Getenv("PROOFCHAIN_API_KEY")
 	if apiKey == "" {
-		apiKey = "atst_d68b397e80587a87d5a5bd11160f400d9dfdd62e913315ec7b2b440a73609be0"
+		t.Skip("PROOFCHAIN_API_KEY not set; skipping live API test")
 	}
-	baseURL := os.Getenv("PROOFCHAIN_BASE_URL")
-	if baseURL == "" {
-		baseURL = "http://api.127.0.0.1.nip.io:8080"
+	var opts []HTTPClientOption
+	if baseURL := os.Getenv("PROOFCHAIN_BASE_URL"); baseURL != "" {
+		opts = append(opts, WithBaseURL(baseURL))
 	}
-	return NewClient(apiKey, WithBaseURL(baseURL))
+	client, err := NewClient(apiKey, opts...)
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	return client
 }
 
 func TestTenantInfo(t *testing.T) {

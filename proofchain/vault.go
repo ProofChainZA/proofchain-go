@@ -151,7 +151,7 @@ func (r *VaultResource) UploadBytes(ctx context.Context, req *VaultUploadBytesRe
 // Get retrieves file details by ID.
 func (r *VaultResource) Get(ctx context.Context, fileID string) (*VaultFile, error) {
 	var result VaultFile
-	err := r.http.Get(ctx, "/tenant/vault/files/"+fileID, nil, &result)
+	err := r.http.Get(ctx, "/tenant/vault/files/"+seg(fileID), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -160,12 +160,12 @@ func (r *VaultResource) Get(ctx context.Context, fileID string) (*VaultFile, err
 
 // Download downloads a file's content.
 func (r *VaultResource) Download(ctx context.Context, fileID string) ([]byte, error) {
-	return r.http.GetRaw(ctx, "/tenant/vault/files/"+fileID+"/download")
+	return r.http.GetRaw(ctx, "/tenant/vault/files/"+seg(fileID)+"/download")
 }
 
 // Delete deletes a file from the vault.
 func (r *VaultResource) Delete(ctx context.Context, fileID string) error {
-	return r.http.Delete(ctx, "/tenant/vault/files/"+fileID)
+	return r.http.Delete(ctx, "/tenant/vault/files/"+seg(fileID))
 }
 
 // Move moves a file to a different folder.
@@ -175,7 +175,7 @@ func (r *VaultResource) Move(ctx context.Context, fileID, folderID string) (*Vau
 	}
 
 	var result VaultFile
-	err := r.http.Post(ctx, "/tenant/vault/files/"+fileID+"/move", payload, &result)
+	err := r.http.Post(ctx, "/tenant/vault/files/"+seg(fileID)+"/move", payload, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +201,7 @@ func (r *VaultResource) CreateFolder(ctx context.Context, name string, parentID 
 
 // DeleteFolder deletes a folder.
 func (r *VaultResource) DeleteFolder(ctx context.Context, folderID string) error {
-	return r.http.Delete(ctx, "/tenant/vault/folders/"+folderID)
+	return r.http.Delete(ctx, "/tenant/vault/folders/"+seg(folderID))
 }
 
 // Stats returns vault storage statistics.

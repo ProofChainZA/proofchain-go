@@ -223,7 +223,7 @@ func (q *QuestsClient) List(ctx context.Context, opts *ListQuestsOptions) ([]Que
 // Get returns a quest by ID
 func (q *QuestsClient) Get(ctx context.Context, questID string) (*Quest, error) {
 	var quest Quest
-	err := q.http.Get(ctx, "/quests/"+questID, nil, &quest)
+	err := q.http.Get(ctx, "/quests/"+seg(questID), nil, &quest)
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +233,7 @@ func (q *QuestsClient) Get(ctx context.Context, questID string) (*Quest, error) 
 // GetBySlug returns a quest by slug
 func (q *QuestsClient) GetBySlug(ctx context.Context, slug string) (*Quest, error) {
 	var quest Quest
-	err := q.http.Get(ctx, "/quests/slug/"+url.PathEscape(slug), nil, &quest)
+	err := q.http.Get(ctx, "/quests/slug/"+seg(slug), nil, &quest)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +253,7 @@ func (q *QuestsClient) Create(ctx context.Context, req *CreateQuestRequest) (*Qu
 // Update updates a quest
 func (q *QuestsClient) Update(ctx context.Context, questID string, req *CreateQuestRequest) (*Quest, error) {
 	var quest Quest
-	err := q.http.Put(ctx, "/quests/"+questID, req, &quest)
+	err := q.http.Put(ctx, "/quests/"+seg(questID), req, &quest)
 	if err != nil {
 		return nil, err
 	}
@@ -262,13 +262,13 @@ func (q *QuestsClient) Update(ctx context.Context, questID string, req *CreateQu
 
 // Delete deletes a quest
 func (q *QuestsClient) Delete(ctx context.Context, questID string) error {
-	return q.http.Delete(ctx, "/quests/"+questID)
+	return q.http.Delete(ctx, "/quests/"+seg(questID))
 }
 
 // Activate activates a quest
 func (q *QuestsClient) Activate(ctx context.Context, questID string) (*Quest, error) {
 	var quest Quest
-	err := q.http.Post(ctx, "/quests/"+questID+"/activate", nil, &quest)
+	err := q.http.Post(ctx, "/quests/"+seg(questID)+"/activate", nil, &quest)
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +278,7 @@ func (q *QuestsClient) Activate(ctx context.Context, questID string) (*Quest, er
 // Pause pauses a quest
 func (q *QuestsClient) Pause(ctx context.Context, questID string) (*Quest, error) {
 	var quest Quest
-	err := q.http.Post(ctx, "/quests/"+questID+"/pause", nil, &quest)
+	err := q.http.Post(ctx, "/quests/"+seg(questID)+"/pause", nil, &quest)
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +288,7 @@ func (q *QuestsClient) Pause(ctx context.Context, questID string) (*Quest, error
 // Archive archives a quest
 func (q *QuestsClient) Archive(ctx context.Context, questID string) (*Quest, error) {
 	var quest Quest
-	err := q.http.Post(ctx, "/quests/"+questID+"/archive", nil, &quest)
+	err := q.http.Post(ctx, "/quests/"+seg(questID)+"/archive", nil, &quest)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +298,7 @@ func (q *QuestsClient) Archive(ctx context.Context, questID string) (*Quest, err
 // GetWithProgress returns quest with user progress
 func (q *QuestsClient) GetWithProgress(ctx context.Context, questID, userID string) (*QuestWithProgress, error) {
 	var quest QuestWithProgress
-	err := q.http.Get(ctx, "/quests/"+questID+"/progress/"+url.PathEscape(userID), nil, &quest)
+	err := q.http.Get(ctx, "/quests/"+seg(questID)+"/progress/"+seg(userID), nil, &quest)
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +326,7 @@ func (q *QuestsClient) ListWithProgress(ctx context.Context, userID string, opts
 // StartQuest starts a quest for a user
 func (q *QuestsClient) StartQuest(ctx context.Context, questID, userID string) (*UserQuestProgress, error) {
 	var progress UserQuestProgress
-	err := q.http.Post(ctx, "/quests/"+questID+"/start", map[string]interface{}{
+	err := q.http.Post(ctx, "/quests/"+seg(questID)+"/start", map[string]interface{}{
 		"user_id": userID,
 	}, &progress)
 	if err != nil {
@@ -338,7 +338,7 @@ func (q *QuestsClient) StartQuest(ctx context.Context, questID, userID string) (
 // GetUserProgress returns user's progress on a quest
 func (q *QuestsClient) GetUserProgress(ctx context.Context, questID, userID string) (*UserQuestProgress, error) {
 	var progress UserQuestProgress
-	err := q.http.Get(ctx, "/quests/"+questID+"/progress/"+url.PathEscape(userID), nil, &progress)
+	err := q.http.Get(ctx, "/quests/"+seg(questID)+"/progress/"+seg(userID), nil, &progress)
 	if err != nil {
 		return nil, err
 	}
@@ -350,7 +350,7 @@ func (q *QuestsClient) GetUserProgress(ctx context.Context, questID, userID stri
 // Idempotent — safe to call multiple times for the same step.
 func (q *QuestsClient) StartStep(ctx context.Context, questID, userID string, stepIndex int) (*StepStartResult, error) {
 	var result StepStartResult
-	err := q.http.Post(ctx, fmt.Sprintf("/quests/%s/progress/%s/step/%d/start", questID, url.PathEscape(userID), stepIndex), nil, &result)
+	err := q.http.Post(ctx, fmt.Sprintf("/quests/%s/progress/%s/step/%d/start", seg(questID), seg(userID), stepIndex), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +360,7 @@ func (q *QuestsClient) StartStep(ctx context.Context, questID, userID string, st
 // CompleteStep completes a step manually by step index
 func (q *QuestsClient) CompleteStep(ctx context.Context, questID, userID string, stepIndex int) (*StepCompletionResult, error) {
 	var result StepCompletionResult
-	err := q.http.Post(ctx, fmt.Sprintf("/quests/%s/progress/%s/step/%d/complete", questID, url.PathEscape(userID), stepIndex), nil, &result)
+	err := q.http.Post(ctx, fmt.Sprintf("/quests/%s/progress/%s/step/%d/complete", seg(questID), seg(userID), stepIndex), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +370,7 @@ func (q *QuestsClient) CompleteStep(ctx context.Context, questID, userID string,
 // ClaimReward claims a completed quest reward (for quests with reward_mode='claimable')
 func (q *QuestsClient) ClaimReward(ctx context.Context, questID, userID string) (*QuestClaimResult, error) {
 	var result QuestClaimResult
-	err := q.http.Post(ctx, fmt.Sprintf("/quests/%s/progress/%s/claim", questID, url.PathEscape(userID)), nil, &result)
+	err := q.http.Post(ctx, fmt.Sprintf("/quests/%s/progress/%s/claim", seg(questID), seg(userID)), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -380,14 +380,14 @@ func (q *QuestsClient) ClaimReward(ctx context.Context, questID, userID string) 
 // GetAllUserProgress returns all quest progress for a user
 func (q *QuestsClient) GetAllUserProgress(ctx context.Context, userID string) ([]UserQuestProgress, error) {
 	var progress []UserQuestProgress
-	err := q.http.Get(ctx, "/quests/user/"+url.PathEscape(userID)+"/progress", nil, &progress)
+	err := q.http.Get(ctx, "/quests/user/"+seg(userID)+"/progress", nil, &progress)
 	return progress, err
 }
 
 // AddStep adds a step to a quest
 func (q *QuestsClient) AddStep(ctx context.Context, questID string, step *CreateQuestStepRequest) (*QuestStep, error) {
 	var result QuestStep
-	err := q.http.Post(ctx, "/quests/"+questID+"/steps", step, &result)
+	err := q.http.Post(ctx, "/quests/"+seg(questID)+"/steps", step, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +397,7 @@ func (q *QuestsClient) AddStep(ctx context.Context, questID string, step *Create
 // UpdateStep updates a step
 func (q *QuestsClient) UpdateStep(ctx context.Context, questID, stepID string, step *CreateQuestStepRequest) (*QuestStep, error) {
 	var result QuestStep
-	err := q.http.Put(ctx, "/quests/"+questID+"/steps/"+stepID, step, &result)
+	err := q.http.Put(ctx, "/quests/"+seg(questID)+"/steps/"+seg(stepID), step, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -406,13 +406,13 @@ func (q *QuestsClient) UpdateStep(ctx context.Context, questID, stepID string, s
 
 // DeleteStep deletes a step
 func (q *QuestsClient) DeleteStep(ctx context.Context, questID, stepID string) error {
-	return q.http.Delete(ctx, "/quests/"+questID+"/steps/"+stepID)
+	return q.http.Delete(ctx, "/quests/"+seg(questID)+"/steps/"+seg(stepID))
 }
 
 // ReorderSteps reorders steps
 func (q *QuestsClient) ReorderSteps(ctx context.Context, questID string, stepIDs []string) (*Quest, error) {
 	var quest Quest
-	err := q.http.Post(ctx, "/quests/"+questID+"/steps/reorder", map[string]interface{}{
+	err := q.http.Post(ctx, "/quests/"+seg(questID)+"/steps/reorder", map[string]interface{}{
 		"step_ids": stepIDs,
 	}, &quest)
 	if err != nil {

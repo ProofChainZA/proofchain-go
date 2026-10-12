@@ -87,10 +87,19 @@ type BatchIngestResponse struct {
 // IngestionClientOption is a function that configures the ingestion client.
 type IngestionClientOption func(*IngestionClient)
 
-// WithIngestURL sets a custom ingestion URL.
+// WithIngestURL sets a custom ingestion URL. The URL must use https://;
+// http:// is only accepted for loopback hosts or with WithIngestInsecureHTTP.
 func WithIngestURL(url string) IngestionClientOption {
 	return func(c *IngestionClient) {
 		c.ingestURL = url
+	}
+}
+
+// WithIngestInsecureHTTP allows a plaintext http:// ingestion URL for a
+// non-loopback host. Only use this for local development behind a trusted network.
+func WithIngestInsecureHTTP() IngestionClientOption {
+	return func(c *IngestionClient) {
+		c.allowInsecure = true
 	}
 }
 
@@ -104,23 +113,28 @@ func WithIngestTimeout(timeout time.Duration) IngestionClientOption {
 // IngestionClient is a high-performance client for the Rust ingestion API.
 // Use this for maximum throughput when ingesting events.
 type IngestionClient struct {
-	apiKey     string
-	ingestURL  string
-	timeout    time.Duration
-	httpClient *http.Client
+	apiKey        string
+	ingestURL     string
+	allowInsecure bool
+	timeout       time.Duration
+	httpClient    *http.Client
 }
 
-// NewIngestionClient creates a new high-performance ingestion client.
+// NewIngestionClient creates a new high-performance ingestion client. It
+// returns an error when the ingestion URL is not https:// (see WithIngestURL).
 //
-// Example:
+// Example (server-side only; never ship an API key to a browser or mobile app):
 //
-//	client := proofchain.NewIngestionClient("your-api-key")
+//	client, err := proofchain.NewIngestionClient("your-api-key")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
 //	result, err := client.Ingest(ctx, &proofchain.IngestEventRequest{
 //	    UserID:    "user-123",
 //	    EventType: "purchase",
 //	    Data:      map[string]interface{}{"amount": 99.99},
 //	})
-func NewIngestionClient(apiKey string, opts ...IngestionClientOption) *IngestionClient {
+func NewIngestionClient(apiKey string, opts ...IngestionClientOption) (*IngestionClient, error) {
 	c := &IngestionClient{
 		apiKey:    apiKey,
 		ingestURL: defaultIngestURL,
@@ -134,8 +148,34 @@ func NewIngestionClient(apiKey string, opts ...IngestionClientOption) *Ingestion
 		opt(c)
 	}
 
+	ingestURL, err := validateBaseURL(c.ingestURL, c.allowInsecure)
+	if err != nil {
+		return nil, err
+	}
+	c.ingestURL = ingestURL
+	c.httpClient = hardenHTTPClient(c.httpClient)
 	c.httpClient.Timeout = c.timeout
-	return c
+	return c, nil
+}
+
+// String implements fmt.Stringer and never exposes the credential.
+func (c *IngestionClient) String() string {
+	return fmt.Sprintf("proofchain.IngestionClient{ingestURL:%q apiKey:%q}", c.ingestURL, redactSecret(c.apiKey))
+}
+
+// GoString implements fmt.GoStringer (%#v) and never exposes the credential.
+func (c *IngestionClient) GoString() string { return c.String() }
+
+// ingestStatusError maps a non-2xx status to an error. Redirects are never
+// followed (credentials must not be replayed to another origin).
+func ingestStatusError(statusCode int, body []byte) error {
+	switch {
+	case statusCode >= 300 && statusCode < 400:
+		return errRedirectNotFollowed
+	case statusCode >= 400:
+		return handleHTTPError(statusCode, body)
+	}
+	return nil
 }
 
 // Ingest sends a single event to the high-performance Rust ingestion API.
@@ -200,8 +240,8 @@ func (c *IngestionClient) Ingest(ctx context.Context, req *IngestEventRequest) (
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	if resp.StatusCode >= 400 {
-		return nil, handleHTTPError(resp.StatusCode, respBody)
+	if err := ingestStatusError(resp.StatusCode, respBody); err != nil {
+		return nil, err
 	}
 
 	var result struct {
@@ -282,8 +322,8 @@ func (c *IngestionClient) IngestBatch(ctx context.Context, req *BatchIngestReque
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	if resp.StatusCode >= 400 {
-		return nil, handleHTTPError(resp.StatusCode, respBody)
+	if err := ingestStatusError(resp.StatusCode, respBody); err != nil {
+		return nil, err
 	}
 
 	var result struct {
@@ -346,7 +386,7 @@ func (c *IngestionClient) IngestBatch(ctx context.Context, req *BatchIngestReque
 
 // GetEventStatus retrieves the status of an event by ID.
 func (c *IngestionClient) GetEventStatus(ctx context.Context, eventID string) (string, error) {
-	httpReq, err := http.NewRequestWithContext(ctx, "GET", c.ingestURL+"/events/"+eventID+"/status", nil)
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", c.ingestURL+"/events/"+seg(eventID)+"/status", nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
@@ -365,8 +405,8 @@ func (c *IngestionClient) GetEventStatus(ctx context.Context, eventID string) (s
 		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
-	if resp.StatusCode >= 400 {
-		return "", handleHTTPError(resp.StatusCode, respBody)
+	if err := ingestStatusError(resp.StatusCode, respBody); err != nil {
+		return "", err
 	}
 
 	var result struct {

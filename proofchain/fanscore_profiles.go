@@ -205,7 +205,7 @@ func (f *FanScoreProfilesClient) GetProfile(ctx context.Context, fanRef, profile
 		profile = "default"
 	}
 	var out FanScoreProfile
-	if err := f.http.Get(ctx, "/fanscore/profiles/"+url.PathEscape(profile)+"/fans/"+url.PathEscape(fanRef), nil, &out); err != nil {
+	if err := f.http.Get(ctx, "/fanscore/profiles/"+seg(profile)+"/fans/"+seg(fanRef), nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -231,7 +231,7 @@ func (f *FanScoreProfilesClient) GetProfiles(ctx context.Context, fanRefs []stri
 	}
 	body := map[string]interface{}{"fan_refs": fanRefs}
 	var out FanScoreProfileBatch
-	if err := f.http.Post(ctx, "/fanscore/profiles/"+url.PathEscape(profile)+"/fans", body, &out); err != nil {
+	if err := f.http.Post(ctx, "/fanscore/profiles/"+seg(profile)+"/fans", body, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -256,7 +256,7 @@ func (f *FanScoreProfilesClient) GetMyProfile(ctx context.Context, profile strin
 // Argument order matches GetProfile; there is no default profile here.
 func (f *FanScoreProfilesClient) GetPublicProfile(ctx context.Context, fanRef, profile string) (*FanScoreProfile, error) {
 	var out FanScoreProfile
-	if err := f.http.GetAnonymous(ctx, "/fanscore/public/"+url.PathEscape(profile)+"/fans/"+url.PathEscape(fanRef), nil, &out); err != nil {
+	if err := f.http.GetAnonymous(ctx, "/fanscore/public/"+seg(profile)+"/fans/"+seg(fanRef), nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -281,7 +281,7 @@ func (f *FanScoreProfilesClient) GetProfileSchema(ctx context.Context, profile s
 		profile = "default"
 	}
 	var out map[string]interface{}
-	if err := f.http.Get(ctx, "/fanscore/profiles/"+url.PathEscape(profile)+"/schema", nil, &out); err != nil {
+	if err := f.http.Get(ctx, "/fanscore/profiles/"+seg(profile)+"/schema", nil, &out); err != nil {
 		return nil, err
 	}
 	return out, nil

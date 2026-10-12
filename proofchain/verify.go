@@ -72,7 +72,7 @@ type VerifyResource struct {
 // Certificate verifies a certificate by ID.
 func (r *VerifyResource) Certificate(ctx context.Context, certificateID string) (*CertificateVerifyResult, error) {
 	var result CertificateVerifyResult
-	err := r.http.Get(ctx, "/verify/cert/"+certificateID, nil, &result)
+	err := r.http.Get(ctx, "/verify/cert/"+seg(certificateID), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func (r *VerifyResource) Certificate(ctx context.Context, certificateID string) 
 // Event verifies an event by its IPFS hash.
 func (r *VerifyResource) Event(ctx context.Context, ipfsHash string) (map[string]interface{}, error) {
 	var result map[string]interface{}
-	err := r.http.Get(ctx, "/verify/event/"+ipfsHash, nil, &result)
+	err := r.http.Get(ctx, "/verify/event/"+seg(ipfsHash), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func (r *VerifyResource) Proof(ctx context.Context, req *ProofVerifyRequest) (*P
 // Batch verifies a batch by ID.
 func (r *VerifyResource) Batch(ctx context.Context, batchID string) (*BatchVerifyResult, error) {
 	var result BatchVerifyResult
-	err := r.http.Get(ctx, "/verify/batch/"+batchID, nil, &result)
+	err := r.http.Get(ctx, "/verify/batch/"+seg(batchID), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func (r *VerifyResource) Batch(ctx context.Context, batchID string) (*BatchVerif
 // EventBatchProof gets the batch proof for a specific event.
 func (r *VerifyResource) EventBatchProof(ctx context.Context, eventID string) (*EventBatchProof, error) {
 	var result EventBatchProof
-	err := r.http.Get(ctx, "/verify/event/"+eventID+"/batch-proof", nil, &result)
+	err := r.http.Get(ctx, "/verify/event/"+seg(eventID)+"/batch-proof", nil, &result)
 	if err != nil {
 		return nil, err
 	}

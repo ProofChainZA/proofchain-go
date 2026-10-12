@@ -147,7 +147,7 @@ func (r *RewardsClient) ListDefinitions(ctx context.Context, opts *ListRewardsOp
 // GetDefinition returns a reward definition by ID
 func (r *RewardsClient) GetDefinition(ctx context.Context, definitionID string) (*RewardDefinition, error) {
 	var definition RewardDefinition
-	err := r.http.Get(ctx, "/rewards/definitions/"+definitionID, nil, &definition)
+	err := r.http.Get(ctx, "/rewards/definitions/"+seg(definitionID), nil, &definition)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +167,7 @@ func (r *RewardsClient) CreateDefinition(ctx context.Context, req *CreateRewardD
 // UpdateDefinition updates a reward definition
 func (r *RewardsClient) UpdateDefinition(ctx context.Context, definitionID string, req *CreateRewardDefinitionRequest) (*RewardDefinition, error) {
 	var definition RewardDefinition
-	err := r.http.Patch(ctx, "/rewards/definitions/"+definitionID, req, &definition)
+	err := r.http.Patch(ctx, "/rewards/definitions/"+seg(definitionID), req, &definition)
 	if err != nil {
 		return nil, err
 	}
@@ -176,13 +176,13 @@ func (r *RewardsClient) UpdateDefinition(ctx context.Context, definitionID strin
 
 // DeleteDefinition deletes a reward definition
 func (r *RewardsClient) DeleteDefinition(ctx context.Context, definitionID string) error {
-	return r.http.Delete(ctx, "/rewards/definitions/"+definitionID)
+	return r.http.Delete(ctx, "/rewards/definitions/"+seg(definitionID))
 }
 
 // ActivateDefinition activates a reward definition
 func (r *RewardsClient) ActivateDefinition(ctx context.Context, definitionID string) (*RewardDefinition, error) {
 	var definition RewardDefinition
-	err := r.http.Post(ctx, "/rewards/definitions/"+definitionID+"/activate", nil, &definition)
+	err := r.http.Post(ctx, "/rewards/definitions/"+seg(definitionID)+"/activate", nil, &definition)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,7 @@ func (r *RewardsClient) ActivateDefinition(ctx context.Context, definitionID str
 // DeactivateDefinition deactivates a reward definition
 func (r *RewardsClient) DeactivateDefinition(ctx context.Context, definitionID string) (*RewardDefinition, error) {
 	var definition RewardDefinition
-	err := r.http.Post(ctx, "/rewards/definitions/"+definitionID+"/deactivate", nil, &definition)
+	err := r.http.Post(ctx, "/rewards/definitions/"+seg(definitionID)+"/deactivate", nil, &definition)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +236,7 @@ func (r *RewardsClient) GetUserRewards(ctx context.Context, userID string, opts 
 		}
 	}
 	var rewards []UserReward
-	err := r.http.Get(ctx, "/rewards/users/"+userID+"/rewards", params, &rewards)
+	err := r.http.Get(ctx, "/rewards/users/"+seg(userID)+"/rewards", params, &rewards)
 	return rewards, err
 }
 
@@ -261,7 +261,7 @@ type ClaimRewardResult struct {
 // Works with both API key and end-user JWT authentication (scoped to own rewards).
 func (r *RewardsClient) ClaimReward(ctx context.Context, earnedRewardID, walletAddress string) (*ClaimRewardResult, error) {
 	var result ClaimRewardResult
-	err := r.http.Post(ctx, fmt.Sprintf("/rewards/earned/%s/claim?wallet_address=%s", earnedRewardID, url.QueryEscape(walletAddress)), nil, &result)
+	err := r.http.Post(ctx, fmt.Sprintf("/rewards/earned/%s/claim?wallet_address=%s", seg(earnedRewardID), url.QueryEscape(walletAddress)), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +278,7 @@ func (r *RewardsClient) AwardManual(ctx context.Context, req *ManualRewardReques
 // DistributePending distributes a pending reward
 func (r *RewardsClient) DistributePending(ctx context.Context, earnedRewardID string) (*EarnedReward, error) {
 	var reward EarnedReward
-	err := r.http.Post(ctx, "/rewards/earned/"+earnedRewardID+"/distribute", nil, &reward)
+	err := r.http.Post(ctx, "/rewards/earned/"+seg(earnedRewardID)+"/distribute", nil, &reward)
 	if err != nil {
 		return nil, err
 	}
@@ -288,6 +288,6 @@ func (r *RewardsClient) DistributePending(ctx context.Context, earnedRewardID st
 // ListAssets returns assets for a reward definition
 func (r *RewardsClient) ListAssets(ctx context.Context, definitionID string) ([]RewardAsset, error) {
 	var assets []RewardAsset
-	err := r.http.Get(ctx, "/rewards/definitions/"+definitionID+"/assets", nil, &assets)
+	err := r.http.Get(ctx, "/rewards/definitions/"+seg(definitionID)+"/assets", nil, &assets)
 	return assets, err
 }

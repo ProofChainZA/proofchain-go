@@ -126,9 +126,9 @@ func (s *SchemasClient) List(ctx context.Context, opts *ListSchemasOptions) (*Sc
 
 // Get returns a schema by name and optional version
 func (s *SchemasClient) Get(ctx context.Context, name string, version *string) (*SchemaDetail, error) {
-	path := "/schemas/" + url.PathEscape(name)
+	path := "/schemas/" + seg(name)
 	if version != nil {
-		path += "/" + url.PathEscape(*version)
+		path += "/" + seg(*version)
 	}
 
 	var schema SchemaDetail
@@ -152,7 +152,7 @@ func (s *SchemasClient) Create(ctx context.Context, yamlContent string) (*Schema
 // Update updates a schema (creates new version)
 func (s *SchemasClient) Update(ctx context.Context, name string, yamlContent string) (*SchemaDetail, error) {
 	var schema SchemaDetail
-	err := s.http.Put(ctx, "/schemas/"+url.PathEscape(name), &CreateSchemaRequest{YAMLContent: yamlContent}, &schema)
+	err := s.http.Put(ctx, "/schemas/"+seg(name), &CreateSchemaRequest{YAMLContent: yamlContent}, &schema)
 	if err != nil {
 		return nil, err
 	}
@@ -161,18 +161,18 @@ func (s *SchemasClient) Update(ctx context.Context, name string, yamlContent str
 
 // Delete deletes a schema
 func (s *SchemasClient) Delete(ctx context.Context, name string, version *string) error {
-	path := "/schemas/" + url.PathEscape(name)
+	path := "/schemas/" + seg(name)
 	if version != nil {
-		path += "/" + url.PathEscape(*version)
+		path += "/" + seg(*version)
 	}
 	return s.http.Delete(ctx, path)
 }
 
 // Activate activates a schema
 func (s *SchemasClient) Activate(ctx context.Context, name string, version *string) (*Schema, error) {
-	path := "/schemas/" + url.PathEscape(name)
+	path := "/schemas/" + seg(name)
 	if version != nil {
-		path += "/" + url.PathEscape(*version)
+		path += "/" + seg(*version)
 	}
 	path += "/activate"
 
@@ -186,9 +186,9 @@ func (s *SchemasClient) Activate(ctx context.Context, name string, version *stri
 
 // Deprecate deprecates a schema
 func (s *SchemasClient) Deprecate(ctx context.Context, name string, version *string) (*Schema, error) {
-	path := "/schemas/" + url.PathEscape(name)
+	path := "/schemas/" + seg(name)
 	if version != nil {
-		path += "/" + url.PathEscape(*version)
+		path += "/" + seg(*version)
 	}
 	path += "/deprecate"
 
@@ -203,7 +203,7 @@ func (s *SchemasClient) Deprecate(ctx context.Context, name string, version *str
 // SetDefault sets a schema as the default for its name
 func (s *SchemasClient) SetDefault(ctx context.Context, name, version string) (*Schema, error) {
 	var schema Schema
-	err := s.http.Post(ctx, "/schemas/"+url.PathEscape(name)+"/"+url.PathEscape(version)+"/set-default", nil, &schema)
+	err := s.http.Post(ctx, "/schemas/"+seg(name)+"/"+seg(version)+"/set-default", nil, &schema)
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +233,7 @@ func (s *SchemasClient) ValidateMultiple(ctx context.Context, schemaNames []stri
 // GetUsageStats returns schema usage statistics
 func (s *SchemasClient) GetUsageStats(ctx context.Context, name string) (*SchemaUsageStats, error) {
 	var stats SchemaUsageStats
-	err := s.http.Get(ctx, "/schemas/"+url.PathEscape(name)+"/stats", nil, &stats)
+	err := s.http.Get(ctx, "/schemas/"+seg(name)+"/stats", nil, &stats)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +250,7 @@ func (s *SchemasClient) Clone(ctx context.Context, sourceName, newName string, n
 	}
 
 	var schema SchemaDetail
-	err := s.http.Post(ctx, "/schemas/"+url.PathEscape(sourceName)+"/clone", body, &schema)
+	err := s.http.Post(ctx, "/schemas/"+seg(sourceName)+"/clone", body, &schema)
 	if err != nil {
 		return nil, err
 	}

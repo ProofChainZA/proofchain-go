@@ -171,7 +171,7 @@ func (r *SearchResource) ByUser(ctx context.Context, userID string, limit, offse
 	}
 
 	var result SearchResponse
-	err := r.http.Get(ctx, "/search/by-user/"+userID, params, &result)
+	err := r.http.Get(ctx, "/search/by-user/"+seg(userID), params, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func (r *SearchResource) ByUser(ctx context.Context, userID string, limit, offse
 // ByCertificate gets an event by certificate ID.
 func (r *SearchResource) ByCertificate(ctx context.Context, certificateID string) (*SearchEventResult, error) {
 	var result SearchEventResult
-	err := r.http.Get(ctx, "/search/by-certificate/"+certificateID, nil, &result)
+	err := r.http.Get(ctx, "/search/by-certificate/"+seg(certificateID), nil, &result)
 	if err != nil {
 		return nil, err
 	}

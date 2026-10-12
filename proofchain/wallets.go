@@ -248,7 +248,7 @@ func (w *WalletClient) Create(ctx context.Context, req *CreateWalletRequest) (*W
 // Get returns a wallet by ID
 func (w *WalletClient) Get(ctx context.Context, walletID string) (*Wallet, error) {
 	var wallet Wallet
-	err := w.http.Get(ctx, "/wallets/"+walletID, nil, &wallet)
+	err := w.http.Get(ctx, "/wallets/"+seg(walletID), nil, &wallet)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +258,7 @@ func (w *WalletClient) Get(ctx context.Context, walletID string) (*Wallet, error
 // ListByUser returns wallets for a user
 func (w *WalletClient) ListByUser(ctx context.Context, userID string) ([]Wallet, error) {
 	var wallets []Wallet
-	err := w.http.Get(ctx, "/wallets/user/"+url.PathEscape(userID), nil, &wallets)
+	err := w.http.Get(ctx, "/wallets/user/"+seg(userID), nil, &wallets)
 	return wallets, err
 }
 
@@ -295,7 +295,7 @@ func (w *WalletClient) CreateDualBulk(ctx context.Context, userIDs []string, net
 // GetBalance returns wallet balance
 func (w *WalletClient) GetBalance(ctx context.Context, walletID string) (*WalletBalance, error) {
 	var balance WalletBalance
-	err := w.http.Get(ctx, "/wallets/"+walletID+"/balance", nil, &balance)
+	err := w.http.Get(ctx, "/wallets/"+seg(walletID)+"/balance", nil, &balance)
 	if err != nil {
 		return nil, err
 	}
@@ -312,13 +312,8 @@ func (w *WalletClient) GetInfo(ctx context.Context, walletID string, opts *GetIn
 		params.Set("include_activity", fmt.Sprintf("%t", opts.IncludeActivity))
 	}
 
-	path := "/wallets/" + walletID + "/info"
-	if len(params) > 0 {
-		path += "?" + params.Encode()
-	}
-
 	var info ComprehensiveWalletInfo
-	err := w.http.Get(ctx, path, nil, &info)
+	err := w.http.Get(ctx, "/wallets/"+seg(walletID)+"/info", params, &info)
 	if err != nil {
 		return nil, err
 	}
@@ -328,29 +323,15 @@ func (w *WalletClient) GetInfo(ctx context.Context, walletID string, opts *GetIn
 // GetUserSummary returns comprehensive summary of all wallets for a user.
 // Aggregates data across all user's wallets (EOA + Smart).
 func (w *WalletClient) GetUserSummary(ctx context.Context, userID string, includeBalances bool) (*UserWalletSummary, error) {
-	path := fmt.Sprintf("/wallets/user/%s/summary?include_balances=%t", url.PathEscape(userID), includeBalances)
+	params := url.Values{}
+	params.Set("include_balances", fmt.Sprintf("%t", includeBalances))
 
 	var summary UserWalletSummary
-	err := w.http.Get(ctx, path, nil, &summary)
+	err := w.http.Get(ctx, "/wallets/user/"+seg(userID)+"/summary", params, &summary)
 	if err != nil {
 		return nil, err
 	}
 	return &summary, nil
-}
-
-// ExportKey exports private key for an EOA wallet
-func (w *WalletClient) ExportKey(ctx context.Context, walletID string) (string, error) {
-	var result struct {
-		PrivateKey string `json:"private_key"`
-		Warning    string `json:"warning"`
-	}
-	err := w.http.Post(ctx, "/wallets/"+walletID+"/export-key", map[string]interface{}{
-		"acknowledge_warning": true,
-	}, &result)
-	if err != nil {
-		return "", err
-	}
-	return result.PrivateKey, nil
 }
 
 // Transfer sends tokens from one address to another.
@@ -387,21 +368,21 @@ func (w *WalletClient) ExecuteSwap(ctx context.Context, req *ExecuteSwapRequest)
 // GetNFTs returns NFTs for a wallet
 func (w *WalletClient) GetNFTs(ctx context.Context, walletID string) ([]NFT, error) {
 	var nfts []NFT
-	err := w.http.Get(ctx, "/wallets/"+walletID+"/nfts", nil, &nfts)
+	err := w.http.Get(ctx, "/wallets/"+seg(walletID)+"/nfts", nil, &nfts)
 	return nfts, err
 }
 
 // GetUserNFTs returns all NFTs for a user
 func (w *WalletClient) GetUserNFTs(ctx context.Context, userID string) ([]NFT, error) {
 	var nfts []NFT
-	err := w.http.Get(ctx, "/wallets/user/"+url.PathEscape(userID)+"/nfts", nil, &nfts)
+	err := w.http.Get(ctx, "/wallets/user/"+seg(userID)+"/nfts", nil, &nfts)
 	return nfts, err
 }
 
 // AddNFT adds an NFT to wallet tracking
 func (w *WalletClient) AddNFT(ctx context.Context, walletID string, req *AddNFTRequest) (*NFT, error) {
 	var nft NFT
-	err := w.http.Post(ctx, "/wallets/"+walletID+"/nfts", req, &nft)
+	err := w.http.Post(ctx, "/wallets/"+seg(walletID)+"/nfts", req, &nft)
 	if err != nil {
 		return nil, err
 	}
@@ -445,13 +426,8 @@ func (w *WalletClient) GetTransactions(ctx context.Context, walletID string, lim
 		params.Set("offset", fmt.Sprintf("%d", offset))
 	}
 
-	path := "/wallets/" + walletID + "/transactions"
-	if len(params) > 0 {
-		path += "?" + params.Encode()
-	}
-
 	var history TransactionHistory
-	err := w.http.Get(ctx, path, nil, &history)
+	err := w.http.Get(ctx, "/wallets/"+seg(walletID)+"/transactions", params, &history)
 	if err != nil {
 		return nil, err
 	}
@@ -478,10 +454,12 @@ type UsersWithWalletsResponse struct {
 
 // ListUsersWithWallets returns all users who have wallets, grouped by user_id.
 func (w *WalletClient) ListUsersWithWallets(ctx context.Context, limit, offset int) (*UsersWithWalletsResponse, error) {
-	path := fmt.Sprintf("/wallets/users-with-wallets?limit=%d&offset=%d", limit, offset)
+	params := url.Values{}
+	params.Set("limit", fmt.Sprintf("%d", limit))
+	params.Set("offset", fmt.Sprintf("%d", offset))
 
 	var response UsersWithWalletsResponse
-	err := w.http.Get(ctx, path, nil, &response)
+	err := w.http.Get(ctx, "/wallets/users-with-wallets", params, &response)
 	if err != nil {
 		return nil, err
 	}
@@ -601,7 +579,7 @@ func (w *WalletClient) ListGlobalTokens(ctx context.Context, network string) ([]
 // GetToken returns a specific token by ID.
 func (w *WalletClient) GetToken(ctx context.Context, tokenID string) (*Token, error) {
 	var token Token
-	err := w.http.Get(ctx, "/tokens/"+tokenID, nil, &token)
+	err := w.http.Get(ctx, "/tokens/"+seg(tokenID), nil, &token)
 	if err != nil {
 		return nil, err
 	}
@@ -610,10 +588,11 @@ func (w *WalletClient) GetToken(ctx context.Context, tokenID string) (*Token, er
 
 // GetTokenByContract returns a token by contract address and network.
 func (w *WalletClient) GetTokenByContract(ctx context.Context, contractAddress, network string) (*Token, error) {
-	path := fmt.Sprintf("/tokens/by-contract/%s?network=%s", contractAddress, url.QueryEscape(network))
+	params := url.Values{}
+	params.Set("network", network)
 
 	var token Token
-	err := w.http.Get(ctx, path, nil, &token)
+	err := w.http.Get(ctx, "/tokens/by-contract/"+seg(contractAddress), params, &token)
 	if err != nil {
 		return nil, err
 	}
@@ -623,7 +602,7 @@ func (w *WalletClient) GetTokenByContract(ctx context.Context, contractAddress, 
 // UpdateToken updates a custom token.
 func (w *WalletClient) UpdateToken(ctx context.Context, tokenID string, req *UpdateTokenRequest) (*Token, error) {
 	var token Token
-	err := w.http.Patch(ctx, "/tokens/"+tokenID, req, &token)
+	err := w.http.Patch(ctx, "/tokens/"+seg(tokenID), req, &token)
 	if err != nil {
 		return nil, err
 	}
@@ -636,5 +615,5 @@ func (w *WalletClient) DeleteToken(ctx context.Context, tokenID string) error {
 		Message string `json:"message"`
 		TokenID string `json:"token_id"`
 	}
-	return w.http.Request(ctx, "DELETE", "/tokens/"+tokenID, nil, &result)
+	return w.http.Request(ctx, "DELETE", "/tokens/"+seg(tokenID), nil, &result)
 }

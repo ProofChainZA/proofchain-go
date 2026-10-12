@@ -259,7 +259,7 @@ func (p *PassportClient) List(ctx context.Context, opts *PassportListOptions) ([
 // Get returns a passport by user ID
 func (p *PassportClient) Get(ctx context.Context, userID string) (*Passport, error) {
 	var passport Passport
-	err := p.http.Get(ctx, "/passports/"+url.PathEscape(userID), nil, &passport)
+	err := p.http.Get(ctx, "/passports/"+seg(userID), nil, &passport)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +297,7 @@ func (p *PassportClient) Create(ctx context.Context, req *CreatePassportRequest)
 // Update updates a passport
 func (p *PassportClient) Update(ctx context.Context, userID string, req *UpdatePassportRequest) (*Passport, error) {
 	var passport Passport
-	err := p.http.Put(ctx, "/passports/"+url.PathEscape(userID), req, &passport)
+	err := p.http.Put(ctx, "/passports/"+seg(userID), req, &passport)
 	if err != nil {
 		return nil, err
 	}
@@ -306,13 +306,13 @@ func (p *PassportClient) Update(ctx context.Context, userID string, req *UpdateP
 
 // Delete deletes a passport
 func (p *PassportClient) Delete(ctx context.Context, userID string) error {
-	return p.http.Delete(ctx, "/passports/"+url.PathEscape(userID))
+	return p.http.Delete(ctx, "/passports/"+seg(userID))
 }
 
 // AddPoints adds points to a passport
 func (p *PassportClient) AddPoints(ctx context.Context, userID string, points int, reason string) (*Passport, error) {
 	var passport Passport
-	err := p.http.Post(ctx, "/passports/"+url.PathEscape(userID)+"/add-points", map[string]interface{}{
+	err := p.http.Post(ctx, "/passports/"+seg(userID)+"/add-points", map[string]interface{}{
 		"points": points,
 		"reason": reason,
 	}, &passport)
@@ -325,7 +325,7 @@ func (p *PassportClient) AddPoints(ctx context.Context, userID string, points in
 // LevelUp levels up a passport
 func (p *PassportClient) LevelUp(ctx context.Context, userID string) (*Passport, error) {
 	var passport Passport
-	err := p.http.Post(ctx, "/passports/"+url.PathEscape(userID)+"/level-up", nil, &passport)
+	err := p.http.Post(ctx, "/passports/"+seg(userID)+"/level-up", nil, &passport)
 	if err != nil {
 		return nil, err
 	}
@@ -344,13 +344,13 @@ func (p *PassportClient) LinkWallet(ctx context.Context, userID string, walletAd
 // GetFieldValues returns all field values for a passport
 func (p *PassportClient) GetFieldValues(ctx context.Context, userID string) ([]FieldValue, error) {
 	var fields []FieldValue
-	err := p.http.Get(ctx, "/passports/"+url.PathEscape(userID)+"/fields", nil, &fields)
+	err := p.http.Get(ctx, "/passports/"+seg(userID)+"/fields", nil, &fields)
 	return fields, err
 }
 
 // SetFieldValue sets a field value manually
 func (p *PassportClient) SetFieldValue(ctx context.Context, userID string, fieldKey string, value interface{}) error {
-	return p.http.Put(ctx, "/passports/"+url.PathEscape(userID)+"/fields/"+fieldKey, value, nil)
+	return p.http.Put(ctx, "/passports/"+seg(userID)+"/fields/"+seg(fieldKey), value, nil)
 }
 
 // RecomputeFields recomputes all computed field values
@@ -358,7 +358,7 @@ func (p *PassportClient) RecomputeFields(ctx context.Context, userID string) (ma
 	var result struct {
 		UpdatedFields map[string]interface{} `json:"updated_fields"`
 	}
-	err := p.http.Post(ctx, "/passports/"+url.PathEscape(userID)+"/recompute", nil, &result)
+	err := p.http.Post(ctx, "/passports/"+seg(userID)+"/recompute", nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +367,7 @@ func (p *PassportClient) RecomputeFields(ctx context.Context, userID string) (ma
 
 // AssignTemplate assigns a template to a passport
 func (p *PassportClient) AssignTemplate(ctx context.Context, userID string, templateID string) error {
-	return p.http.Post(ctx, "/passports/"+url.PathEscape(userID)+"/assign-template/"+templateID, nil, nil)
+	return p.http.Post(ctx, "/passports/"+seg(userID)+"/assign-template/"+seg(templateID), nil, nil)
 }
 
 // ---------------------------------------------------------------------------
@@ -384,7 +384,7 @@ func (p *PassportClient) ListTemplates(ctx context.Context) ([]PassportTemplate,
 // GetTemplate returns a template by ID
 func (p *PassportClient) GetTemplate(ctx context.Context, templateID string) (*PassportTemplate, error) {
 	var template PassportTemplate
-	err := p.http.Get(ctx, "/passports/templates/"+templateID, nil, &template)
+	err := p.http.Get(ctx, "/passports/templates/"+seg(templateID), nil, &template)
 	if err != nil {
 		return nil, err
 	}
@@ -404,7 +404,7 @@ func (p *PassportClient) CreateTemplate(ctx context.Context, req *CreateTemplate
 // AddTemplateField adds a field to a template
 func (p *PassportClient) AddTemplateField(ctx context.Context, templateID string, req *CreateTemplateFieldRequest) (*TemplateField, error) {
 	var field TemplateField
-	err := p.http.Post(ctx, "/passports/templates/"+templateID+"/fields", req, &field)
+	err := p.http.Post(ctx, "/passports/templates/"+seg(templateID)+"/fields", req, &field)
 	if err != nil {
 		return nil, err
 	}
@@ -413,7 +413,7 @@ func (p *PassportClient) AddTemplateField(ctx context.Context, templateID string
 
 // DeleteTemplate deletes a template
 func (p *PassportClient) DeleteTemplate(ctx context.Context, templateID string) error {
-	return p.http.Delete(ctx, "/passports/templates/"+templateID)
+	return p.http.Delete(ctx, "/passports/templates/"+seg(templateID))
 }
 
 // ---------------------------------------------------------------------------
@@ -440,7 +440,7 @@ func (p *PassportClient) CreateBadge(ctx context.Context, req *CreateBadgeReques
 // AwardBadge awards a badge to a user
 func (p *PassportClient) AwardBadge(ctx context.Context, userID string, badgeID string, metadata map[string]interface{}) (*UserBadge, error) {
 	var userBadge UserBadge
-	err := p.http.Post(ctx, "/passports/"+url.PathEscape(userID)+"/badges/"+badgeID, map[string]interface{}{
+	err := p.http.Post(ctx, "/passports/"+seg(userID)+"/badges/"+seg(badgeID), map[string]interface{}{
 		"metadata": metadata,
 	}, &userBadge)
 	if err != nil {
@@ -452,7 +452,7 @@ func (p *PassportClient) AwardBadge(ctx context.Context, userID string, badgeID 
 // GetUserBadges returns badges earned by a user
 func (p *PassportClient) GetUserBadges(ctx context.Context, userID string) ([]UserBadge, error) {
 	var badges []UserBadge
-	err := p.http.Get(ctx, "/passports/"+url.PathEscape(userID)+"/badges", nil, &badges)
+	err := p.http.Get(ctx, "/passports/"+seg(userID)+"/badges", nil, &badges)
 	return badges, err
 }
 
@@ -480,14 +480,14 @@ func (p *PassportClient) CreateAchievement(ctx context.Context, req *CreateAchie
 // GetUserAchievements returns achievements for a user
 func (p *PassportClient) GetUserAchievements(ctx context.Context, userID string) ([]UserAchievement, error) {
 	var achievements []UserAchievement
-	err := p.http.Get(ctx, "/passports/"+url.PathEscape(userID)+"/achievements", nil, &achievements)
+	err := p.http.Get(ctx, "/passports/"+seg(userID)+"/achievements", nil, &achievements)
 	return achievements, err
 }
 
 // UpdateAchievementProgress updates achievement progress
 func (p *PassportClient) UpdateAchievementProgress(ctx context.Context, userID string, achievementID string, progress float64) (*UserAchievement, error) {
 	var achievement UserAchievement
-	err := p.http.Put(ctx, "/passports/"+url.PathEscape(userID)+"/achievements/"+achievementID, map[string]interface{}{
+	err := p.http.Put(ctx, "/passports/"+seg(userID)+"/achievements/"+seg(achievementID), map[string]interface{}{
 		"progress": progress,
 	}, &achievement)
 	if err != nil {
@@ -513,6 +513,6 @@ func (p *PassportClient) GetHistory(ctx context.Context, userID string, opts *Pa
 	}
 
 	var history []PassportHistory
-	err := p.http.Get(ctx, "/passports/"+url.PathEscape(userID)+"/history", params, &history)
+	err := p.http.Get(ctx, "/passports/"+seg(userID)+"/history", params, &history)
 	return history, err
 }

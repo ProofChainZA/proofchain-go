@@ -21,7 +21,10 @@ func main() {
 		log.Fatal("PROOFCHAIN_API_KEY environment variable not set")
 	}
 
-	client := proofchain.NewClient(apiKey)
+	client, err := proofchain.NewClient(apiKey)
+	if err != nil {
+		log.Fatalf("Failed to create client: %v", err)
+	}
 	ctx := context.Background()
 
 	// Create a state channel
