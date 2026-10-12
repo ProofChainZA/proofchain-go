@@ -275,7 +275,7 @@ func (u *EndUsersClient) List(ctx context.Context, opts *ListEndUsersOptions) (*
 // Get returns an end-user by internal UUID.
 func (u *EndUsersClient) Get(ctx context.Context, userID string) (*EndUser, error) {
 	var user EndUser
-	err := u.http.Get(ctx, "/end-users/"+userID, nil, &user)
+	err := u.http.Get(ctx, "/end-users/"+seg(userID), nil, &user)
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +285,7 @@ func (u *EndUsersClient) Get(ctx context.Context, userID string) (*EndUser, erro
 // GetByExternalID returns an end-user by external ID.
 func (u *EndUsersClient) GetByExternalID(ctx context.Context, externalID string) (*EndUser, error) {
 	var user EndUser
-	err := u.http.Get(ctx, "/end-users/by-external/"+url.PathEscape(externalID), nil, &user)
+	err := u.http.Get(ctx, "/end-users/by-external/"+seg(externalID), nil, &user)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +305,7 @@ func (u *EndUsersClient) Create(ctx context.Context, req *CreateEndUserRequest) 
 // Update updates an end-user profile by internal UUID.
 func (u *EndUsersClient) Update(ctx context.Context, userID string, req *UpdateEndUserRequest) (*EndUser, error) {
 	var user EndUser
-	err := u.http.Patch(ctx, "/end-users/"+userID, req, &user)
+	err := u.http.Patch(ctx, "/end-users/"+seg(userID), req, &user)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +315,7 @@ func (u *EndUsersClient) Update(ctx context.Context, userID string, req *UpdateE
 // UpdateByExternalID updates an end-user profile by external ID.
 func (u *EndUsersClient) UpdateByExternalID(ctx context.Context, externalID string, req *UpdateEndUserRequest) (*EndUser, error) {
 	var user EndUser
-	err := u.http.Patch(ctx, "/end-users/by-external/"+url.PathEscape(externalID), req, &user)
+	err := u.http.Patch(ctx, "/end-users/by-external/"+seg(externalID), req, &user)
 	if err != nil {
 		return nil, err
 	}
@@ -325,7 +325,7 @@ func (u *EndUsersClient) UpdateByExternalID(ctx context.Context, externalID stri
 // LinkWallet links a wallet to an end-user by external ID.
 func (u *EndUsersClient) LinkWallet(ctx context.Context, externalID string, req *LinkWalletRequest) (*EndUser, error) {
 	var user EndUser
-	err := u.http.Post(ctx, "/end-users/by-external/"+url.PathEscape(externalID)+"/link-wallet", req, &user)
+	err := u.http.Post(ctx, "/end-users/by-external/"+seg(externalID)+"/link-wallet", req, &user)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +335,7 @@ func (u *EndUsersClient) LinkWallet(ctx context.Context, externalID string, req 
 // CreateWallet creates a CDP (custodial) wallet for an end-user by external ID.
 func (u *EndUsersClient) CreateWallet(ctx context.Context, externalID string, req *CreateUserWalletRequest) (*WalletCreationResult, error) {
 	var result WalletCreationResult
-	err := u.http.Post(ctx, "/end-users/by-external/"+url.PathEscape(externalID)+"/create-wallet", req, &result)
+	err := u.http.Post(ctx, "/end-users/by-external/"+seg(externalID)+"/create-wallet", req, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +345,7 @@ func (u *EndUsersClient) CreateWallet(ctx context.Context, externalID string, re
 // RegisterWallet registers an external wallet for an end-user by external ID.
 func (u *EndUsersClient) RegisterWallet(ctx context.Context, externalID string, req *RegisterWalletRequest) (*WalletCreationResult, error) {
 	var result WalletCreationResult
-	err := u.http.Post(ctx, "/end-users/by-external/"+url.PathEscape(externalID)+"/register-wallet", req, &result)
+	err := u.http.Post(ctx, "/end-users/by-external/"+seg(externalID)+"/register-wallet", req, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +360,7 @@ func (u *EndUsersClient) GetActivity(ctx context.Context, externalID string, day
 	}
 
 	var response UserActivityResponse
-	err := u.http.Get(ctx, "/end-users/by-external/"+url.PathEscape(externalID)+"/activity", params, &response)
+	err := u.http.Get(ctx, "/end-users/by-external/"+seg(externalID)+"/activity", params, &response)
 	if err != nil {
 		return nil, err
 	}
@@ -376,7 +376,7 @@ func (u *EndUsersClient) AddPoints(ctx context.Context, externalID string, point
 	}
 
 	var result PointsResult
-	path := "/end-users/by-external/" + url.PathEscape(externalID) + "/add-points?" + params.Encode()
+	path := "/end-users/by-external/" + seg(externalID) + "/add-points?" + params.Encode()
 	err := u.http.Post(ctx, path, map[string]interface{}{}, &result)
 	if err != nil {
 		return nil, err
@@ -398,7 +398,7 @@ func (u *EndUsersClient) GetRewards(ctx context.Context, externalID string, stat
 	}
 
 	var response UserRewardsResponse
-	err := u.http.Get(ctx, "/end-users/by-external/"+url.PathEscape(externalID)+"/rewards", params, &response)
+	err := u.http.Get(ctx, "/end-users/by-external/"+seg(externalID)+"/rewards", params, &response)
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +419,7 @@ func (u *EndUsersClient) GetRewardsByInternalID(ctx context.Context, userID stri
 	}
 
 	var response UserRewardsResponse
-	err := u.http.Get(ctx, "/end-users/"+userID+"/rewards", params, &response)
+	err := u.http.Get(ctx, "/end-users/"+seg(userID)+"/rewards", params, &response)
 	if err != nil {
 		return nil, err
 	}
@@ -502,7 +502,7 @@ func (u *EndUsersClient) EnsureWallet(ctx context.Context, externalID string, ne
 		AssetWallets []Wallet `json:"asset_wallets"`
 		SmartWallets []Wallet `json:"smart_wallets"`
 	}
-	err := u.http.Get(ctx, "/wallets/user/"+url.PathEscape(externalID)+"/all", nil, &userWallets)
+	err := u.http.Get(ctx, "/wallets/user/"+seg(externalID)+"/all", nil, &userWallets)
 	if err == nil {
 		var eoa, smart *Wallet
 		if len(userWallets.AssetWallets) > 0 {
@@ -591,7 +591,7 @@ func (u *EndUsersClient) EnsureWallet(ctx context.Context, externalID string, ne
 // GDPRPreview previews what would be deleted for a GDPR request.
 func (u *EndUsersClient) GDPRPreview(ctx context.Context, userID string) (*GDPRPreviewResponse, error) {
 	var result GDPRPreviewResponse
-	err := u.http.Get(ctx, "/end-users/"+userID+"/gdpr/preview", nil, &result)
+	err := u.http.Get(ctx, "/end-users/"+seg(userID)+"/gdpr/preview", nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -601,7 +601,7 @@ func (u *EndUsersClient) GDPRPreview(ctx context.Context, userID string) (*GDPRP
 // GDPRDelete permanently deletes all user data (Right to Be Forgotten).
 func (u *EndUsersClient) GDPRDelete(ctx context.Context, userID string, req *GDPRDeletionRequest) (*GDPRDeletionResponse, error) {
 	var result GDPRDeletionResponse
-	err := u.http.Request(ctx, "DELETE", "/end-users/"+userID+"/gdpr", req, &result)
+	err := u.http.Request(ctx, "DELETE", "/end-users/"+seg(userID)+"/gdpr", req, &result)
 	if err != nil {
 		return nil, err
 	}

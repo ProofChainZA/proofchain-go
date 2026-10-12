@@ -54,7 +54,7 @@ func NewPartnerKeysClient(http *HTTPClient) *PartnerKeysClient {
 // RequestOTT requests a one-time token for a partner key (end-user JWKS auth).
 func (c *PartnerKeysClient) RequestOTT(ctx context.Context, keyID string) (*OTTRequestResponse, error) {
 	var result OTTRequestResponse
-	err := c.http.Post(ctx, "/partner-keys/"+keyID+"/ott/request", nil, &result)
+	err := c.http.Post(ctx, "/partner-keys/"+seg(keyID)+"/ott/request", nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (c *PartnerKeysClient) RedeemOTT(ctx context.Context, req *OTTRedeemRequest
 // UpdateOTTConfig updates OTT configuration for a partner key.
 func (c *PartnerKeysClient) UpdateOTTConfig(ctx context.Context, keyID string, config *OTTConfigUpdate) (*OTTConfigResponse, error) {
 	var result OTTConfigResponse
-	err := c.http.Patch(ctx, "/partner-keys/"+keyID+"/ott-config", config, &result)
+	err := c.http.Patch(ctx, "/partner-keys/"+seg(keyID)+"/ott-config", config, &result)
 	if err != nil {
 		return nil, err
 	}

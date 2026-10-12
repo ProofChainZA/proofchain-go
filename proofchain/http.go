@@ -41,21 +41,39 @@ const (
 
 // HTTPClient handles HTTP requests to the ProofChain API.
 type HTTPClient struct {
-	apiKey     string
-	userToken  string // End-user JWT for JWKS auth (alternative to apiKey)
-	tenantID   string // Required when using userToken
-	baseURL    string
-	httpClient *http.Client
-	maxRetries int
+	apiKey        string
+	userToken     string // End-user JWT for JWKS auth (alternative to apiKey)
+	tenantID      string // Required when using userToken
+	baseURL       string
+	allowInsecure bool
+	httpClient    *http.Client
+	maxRetries    int
 }
+
+// String implements fmt.Stringer and never exposes the credential.
+func (c *HTTPClient) String() string {
+	return fmt.Sprintf("proofchain.HTTPClient{baseURL:%q apiKey:%q}", c.baseURL, redactSecret(c.apiKey))
+}
+
+// GoString implements fmt.GoStringer (%#v) and never exposes the credential.
+func (c *HTTPClient) GoString() string { return c.String() }
 
 // HTTPClientOption is a function that configures the HTTP client.
 type HTTPClientOption func(*HTTPClient)
 
-// WithBaseURL sets a custom base URL.
+// WithBaseURL sets a custom base URL. The URL must use https://; http:// is
+// only accepted for loopback hosts or together with WithInsecureHTTP.
 func WithBaseURL(baseURL string) HTTPClientOption {
 	return func(c *HTTPClient) {
 		c.baseURL = baseURL
+	}
+}
+
+// WithInsecureHTTP allows a plaintext http:// base URL for a non-loopback
+// host. Only use this for local development behind a trusted network.
+func WithInsecureHTTP() HTTPClientOption {
+	return func(c *HTTPClient) {
+		c.allowInsecure = true
 	}
 }
 
@@ -91,8 +109,10 @@ func WithUserToken(token, tenantID string) HTTPClientOption {
 	}
 }
 
-// NewHTTPClient creates a new HTTP client.
-func NewHTTPClient(apiKey string, opts ...HTTPClientOption) *HTTPClient {
+// NewHTTPClient creates a new HTTP client. It returns an error when the base
+// URL is not https:// (see WithBaseURL). The client never follows redirects,
+// so credentials are never replayed to another origin.
+func NewHTTPClient(apiKey string, opts ...HTTPClientOption) (*HTTPClient, error) {
 	c := &HTTPClient{
 		apiKey:  apiKey,
 		baseURL: defaultBaseURL,
@@ -106,10 +126,18 @@ func NewHTTPClient(apiKey string, opts ...HTTPClientOption) *HTTPClient {
 		opt(c)
 	}
 
-	return c
+	baseURL, err := validateBaseURL(c.baseURL, c.allowInsecure)
+	if err != nil {
+		return nil, err
+	}
+	c.baseURL = baseURL
+	c.httpClient = hardenHTTPClient(c.httpClient)
+
+	return c, nil
 }
 
 // NewHTTPClientFromEnv creates a client using the PROOFCHAIN_API_KEY environment variable.
+// PROOFCHAIN_BASE_URL, when set, overrides the base URL and is validated like WithBaseURL.
 func NewHTTPClientFromEnv(opts ...HTTPClientOption) (*HTTPClient, error) {
 	apiKey := os.Getenv("PROOFCHAIN_API_KEY")
 	if apiKey == "" {
@@ -121,7 +149,7 @@ func NewHTTPClientFromEnv(opts ...HTTPClientOption) (*HTTPClient, error) {
 		opts = append(opts, WithBaseURL(baseURL))
 	}
 
-	return NewHTTPClient(apiKey, opts...), nil
+	return NewHTTPClient(apiKey, opts...)
 }
 
 // Request makes an HTTP request to the API.
@@ -224,6 +252,14 @@ func (c *HTTPClient) executeRequest(req *http.Request, result interface{}) error
 	var lastErr error
 
 	for attempt := 0; attempt <= c.maxRetries; attempt++ {
+		if attempt > 0 && req.GetBody != nil {
+			// The previous attempt consumed the body; rebuild it.
+			body, err := req.GetBody()
+			if err != nil {
+				return NewNetworkError(err)
+			}
+			req.Body = body
+		}
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			if ctx := req.Context(); ctx.Err() != nil {
@@ -238,6 +274,10 @@ func (c *HTTPClient) executeRequest(req *http.Request, result interface{}) error
 		if err != nil {
 			lastErr = NewNetworkError(err)
 			continue
+		}
+
+		if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+			return errRedirectNotFollowed
 		}
 
 		if err := c.handleResponse(resp.StatusCode, respBody, result); err != nil {
@@ -371,6 +411,10 @@ func (c *HTTPClient) GetRaw(ctx context.Context, path string) ([]byte, error) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, NewNetworkError(err)
+	}
+
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		return nil, errRedirectNotFollowed
 	}
 
 	if resp.StatusCode != http.StatusOK {

@@ -46,7 +46,7 @@ func newFanScoreClient(t *testing.T, apiKey string, handler http.HandlerFunc, op
 	t.Helper()
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
-	return NewFanScoreProfilesClient(NewHTTPClient(apiKey, append(opts, WithBaseURL(srv.URL))...))
+	return NewFanScoreProfilesClient(mustHTTPClient(t, apiKey, append(opts, WithBaseURL(srv.URL))...))
 }
 
 func TestFanScoreProfilesGetProfile(t *testing.T) {

@@ -1,14 +1,16 @@
 module github.com/ProofChainZA/proofchain-go
 
-go 1.21
+go 1.26.0
 
-require google.golang.org/grpc v1.60.1
+require google.golang.org/grpc v1.83.1 // indirect
 
 require (
-	github.com/golang/protobuf v1.5.3 // indirect
-	golang.org/x/net v0.20.0 // indirect
-	golang.org/x/sys v0.16.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240116215550-a9fa1716bcac // indirect
-	google.golang.org/protobuf v1.32.0 // indirect
+	github.com/ProofChainZA/proofchain-go/proofchain v0.0.0
+	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 )
+
+replace github.com/ProofChainZA/proofchain-go/proofchain => ./proofchain

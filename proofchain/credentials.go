@@ -9,25 +9,25 @@ import (
 
 // CredentialType represents a tenant-defined credential template
 type CredentialType struct {
-	ID                 string                 `json:"id"`
-	Name               string                 `json:"name"`
-	Slug               string                 `json:"slug"`
-	Description        *string                `json:"description,omitempty"`
-	Category           *string                `json:"category,omitempty"`
-	IconURL            *string                `json:"icon_url,omitempty"`
-	BadgeColor         *string                `json:"badge_color,omitempty"`
-	DisplayOrder       int                    `json:"display_order"`
-	SchemaDefinition   map[string]interface{} `json:"schema_definition"`
-	IsRevocable        bool                   `json:"is_revocable"`
-	DefaultExpiryDays  *int                   `json:"default_expiry_days,omitempty"`
-	MaxActivePerUser   int                    `json:"max_active_per_user"`
-	AutoRenew          bool                   `json:"auto_renew"`
-	DefaultVisibility  string                 `json:"default_visibility"`
-	RequiresOptIn      bool                   `json:"requires_opt_in"`
-	Status             string                 `json:"status"`
-	TotalIssued        int                    `json:"total_issued"`
-	TotalActive        int                    `json:"total_active"`
-	CreatedAt          time.Time              `json:"created_at"`
+	ID                string                 `json:"id"`
+	Name              string                 `json:"name"`
+	Slug              string                 `json:"slug"`
+	Description       *string                `json:"description,omitempty"`
+	Category          *string                `json:"category,omitempty"`
+	IconURL           *string                `json:"icon_url,omitempty"`
+	BadgeColor        *string                `json:"badge_color,omitempty"`
+	DisplayOrder      int                    `json:"display_order"`
+	SchemaDefinition  map[string]interface{} `json:"schema_definition"`
+	IsRevocable       bool                   `json:"is_revocable"`
+	DefaultExpiryDays *int                   `json:"default_expiry_days,omitempty"`
+	MaxActivePerUser  int                    `json:"max_active_per_user"`
+	AutoRenew         bool                   `json:"auto_renew"`
+	DefaultVisibility string                 `json:"default_visibility"`
+	RequiresOptIn     bool                   `json:"requires_opt_in"`
+	Status            string                 `json:"status"`
+	TotalIssued       int                    `json:"total_issued"`
+	TotalActive       int                    `json:"total_active"`
+	CreatedAt         time.Time              `json:"created_at"`
 }
 
 // IssuedCredential represents a credential issued to a user
@@ -158,7 +158,7 @@ func (c *CredentialsClient) ListTypes(ctx context.Context, status, category stri
 // GetType returns a credential type by ID
 func (c *CredentialsClient) GetType(ctx context.Context, typeID string) (*CredentialType, error) {
 	var ct CredentialType
-	err := c.http.Get(ctx, "/credentials/types/"+typeID, nil, &ct)
+	err := c.http.Get(ctx, "/credentials/types/"+seg(typeID), nil, &ct)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +168,7 @@ func (c *CredentialsClient) GetType(ctx context.Context, typeID string) (*Creden
 // UpdateType updates a credential type
 func (c *CredentialsClient) UpdateType(ctx context.Context, typeID string, req *CreateCredentialTypeRequest) (*CredentialType, error) {
 	var ct CredentialType
-	err := c.http.Put(ctx, "/credentials/types/"+typeID, req, &ct)
+	err := c.http.Put(ctx, "/credentials/types/"+seg(typeID), req, &ct)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +178,7 @@ func (c *CredentialsClient) UpdateType(ctx context.Context, typeID string, req *
 // ActivateType activates a credential type
 func (c *CredentialsClient) ActivateType(ctx context.Context, typeID string) (*CredentialType, error) {
 	var ct CredentialType
-	err := c.http.Post(ctx, "/credentials/types/"+typeID+"/activate", nil, &ct)
+	err := c.http.Post(ctx, "/credentials/types/"+seg(typeID)+"/activate", nil, &ct)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +188,7 @@ func (c *CredentialsClient) ActivateType(ctx context.Context, typeID string) (*C
 // ArchiveType archives a credential type
 func (c *CredentialsClient) ArchiveType(ctx context.Context, typeID string) (*CredentialType, error) {
 	var ct CredentialType
-	err := c.http.Post(ctx, "/credentials/types/"+typeID+"/archive", nil, &ct)
+	err := c.http.Post(ctx, "/credentials/types/"+seg(typeID)+"/archive", nil, &ct)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +237,7 @@ func (c *CredentialsClient) ListIssued(ctx context.Context, opts *ListIssuedCred
 
 // Revoke revokes an issued credential
 func (c *CredentialsClient) Revoke(ctx context.Context, credentialID string, reason string) (*IssuedCredential, error) {
-	path := "/credentials/issued/" + credentialID + "/revoke"
+	path := "/credentials/issued/" + seg(credentialID) + "/revoke"
 	if reason != "" {
 		path += "?reason=" + url.QueryEscape(reason)
 	}
@@ -251,7 +251,7 @@ func (c *CredentialsClient) Revoke(ctx context.Context, credentialID string, rea
 
 // Suspend suspends an issued credential
 func (c *CredentialsClient) Suspend(ctx context.Context, credentialID string, reason string) (*IssuedCredential, error) {
-	path := "/credentials/issued/" + credentialID + "/suspend"
+	path := "/credentials/issued/" + seg(credentialID) + "/suspend"
 	if reason != "" {
 		path += "?reason=" + url.QueryEscape(reason)
 	}
@@ -266,7 +266,7 @@ func (c *CredentialsClient) Suspend(ctx context.Context, credentialID string, re
 // Reinstate reinstates a suspended credential
 func (c *CredentialsClient) Reinstate(ctx context.Context, credentialID string) (*IssuedCredential, error) {
 	var cred IssuedCredential
-	err := c.http.Post(ctx, "/credentials/issued/"+credentialID+"/reinstate", nil, &cred)
+	err := c.http.Post(ctx, "/credentials/issued/"+seg(credentialID)+"/reinstate", nil, &cred)
 	if err != nil {
 		return nil, err
 	}
@@ -280,19 +280,19 @@ func (c *CredentialsClient) Reinstate(ctx context.Context, credentialID string) 
 // OptInUser opts a user in to identity credentials
 func (c *CredentialsClient) OptInUser(ctx context.Context, userExternalID string) error {
 	var result map[string]interface{}
-	return c.http.Post(ctx, "/credentials/opt-in/"+userExternalID, nil, &result)
+	return c.http.Post(ctx, "/credentials/opt-in/"+seg(userExternalID), nil, &result)
 }
 
 // OptOutUser opts a user out of identity credentials
 func (c *CredentialsClient) OptOutUser(ctx context.Context, userExternalID string) error {
 	var result map[string]interface{}
-	return c.http.Post(ctx, "/credentials/opt-out/"+userExternalID, nil, &result)
+	return c.http.Post(ctx, "/credentials/opt-out/"+seg(userExternalID), nil, &result)
 }
 
 // GetUserCredentials returns all credentials for a user
 func (c *CredentialsClient) GetUserCredentials(ctx context.Context, userExternalID string) (*UserCredentialsSummary, error) {
 	var summary UserCredentialsSummary
-	err := c.http.Get(ctx, "/credentials/user/"+userExternalID, nil, &summary)
+	err := c.http.Get(ctx, "/credentials/user/"+seg(userExternalID), nil, &summary)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +306,7 @@ func (c *CredentialsClient) GetUserCredentials(ctx context.Context, userExternal
 // Verify verifies a credential by its verification code (public, no auth needed)
 func (c *CredentialsClient) Verify(ctx context.Context, verificationCode string) (*CredentialVerifyResult, error) {
 	var result CredentialVerifyResult
-	err := c.http.Get(ctx, "/credentials/verify/"+verificationCode, nil, &result)
+	err := c.http.Get(ctx, "/credentials/verify/"+seg(verificationCode), nil, &result)
 	if err != nil {
 		return nil, err
 	}

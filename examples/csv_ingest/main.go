@@ -26,7 +26,10 @@ func main() {
 	}
 
 	// Create ingestion client
-	client := proofchain.NewIngestionClient(apiKey)
+	client, err := proofchain.NewIngestionClient(apiKey)
+	if err != nil {
+		log.Fatalf("Failed to create ingestion client: %v", err)
+	}
 	ctx := context.Background()
 
 	totalEvents := 0

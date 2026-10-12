@@ -152,7 +152,7 @@ func (c *CohortLeaderboardClient) List(ctx context.Context, opts *ListCohortsOpt
 // Get returns a cohort definition by ID.
 func (c *CohortLeaderboardClient) Get(ctx context.Context, cohortID string) (*CohortDefinition, error) {
 	var definition CohortDefinition
-	err := c.http.Get(ctx, "/cohorts/definitions/"+url.PathEscape(cohortID), nil, &definition)
+	err := c.http.Get(ctx, "/cohorts/definitions/"+seg(cohortID), nil, &definition)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +185,7 @@ func (c *CohortLeaderboardClient) GetLeaderboard(ctx context.Context, cohortID s
 	}
 
 	var response CohortLeaderboardResponse
-	err := c.http.Get(ctx, "/cohorts/definitions/"+url.PathEscape(cohortID)+"/leaderboard", params, &response)
+	err := c.http.Get(ctx, "/cohorts/definitions/"+seg(cohortID)+"/leaderboard", params, &response)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +204,7 @@ func (c *CohortLeaderboardClient) GetUserBreakdown(ctx context.Context, userID s
 	}
 
 	var response UserBreakdownResponse
-	err := c.http.Get(ctx, "/cohorts/users/"+url.PathEscape(userID)+"/breakdown", params, &response)
+	err := c.http.Get(ctx, "/cohorts/users/"+seg(userID)+"/breakdown", params, &response)
 	if err != nil {
 		return nil, err
 	}

@@ -35,12 +35,12 @@ type FanpassGroupStats struct {
 type FanpassLeaderboardResponse struct {
 	AggregationRuleID        *string                   `json:"aggregation_rule_id,omitempty"`
 	AggregationRuleName      *string                   `json:"aggregation_rule_name,omitempty"`
-	Filter                   map[string]interface{}     `json:"filter"`
-	TotalUsers               int                        `json:"total_users"`
-	GroupStats               FanpassGroupStats          `json:"group_stats"`
-	Leaderboard              []FanpassLeaderboardEntry  `json:"leaderboard"`
-	CurrentUser              *FanpassLeaderboardEntry   `json:"current_user,omitempty"`
-	CurrentUserInLeaderboard bool                       `json:"current_user_in_leaderboard"`
+	Filter                   map[string]interface{}    `json:"filter"`
+	TotalUsers               int                       `json:"total_users"`
+	GroupStats               FanpassGroupStats         `json:"group_stats"`
+	Leaderboard              []FanpassLeaderboardEntry `json:"leaderboard"`
+	CurrentUser              *FanpassLeaderboardEntry  `json:"current_user,omitempty"`
+	CurrentUserInLeaderboard bool                      `json:"current_user_in_leaderboard"`
 }
 
 // FanpassUserComparisonResponse contains a user's comparison across all cohorts.
@@ -127,7 +127,7 @@ func (f *FanpassLeaderboardClient) GetUserComparison(ctx context.Context, userID
 	}
 
 	var response FanpassUserComparisonResponse
-	err := f.http.Get(ctx, "/passport-v2/fanpass/"+url.PathEscape(userID)+"/comparison", params, &response)
+	err := f.http.Get(ctx, "/passport-v2/fanpass/"+seg(userID)+"/comparison", params, &response)
 	if err != nil {
 		return nil, err
 	}

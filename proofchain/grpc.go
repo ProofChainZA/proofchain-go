@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -69,10 +69,13 @@ func WithGRPCTimeout(timeout time.Duration) GRPCClientOption {
 	}
 }
 
-// WithTLS enables or disables TLS (enabled by default for port 443).
-func WithTLS(enabled bool) GRPCClientOption {
+// WithInsecurePlaintext disables TLS for the gRPC connection. It is only
+// honoured when the endpoint host is loopback (localhost, 127.0.0.1, ::1);
+// NewGRPCClient returns an error for any other host so an API key is never
+// sent in cleartext over a network.
+func WithInsecurePlaintext() GRPCClientOption {
 	return func(c *GRPCClient) {
-		c.useTLS = enabled
+		c.plaintext = true
 	}
 }
 
@@ -94,27 +97,39 @@ type GRPCClient struct {
 	apiKey     string
 	endpoint   string
 	timeout    time.Duration
-	useTLS     bool
+	plaintext  bool
 	numStreams int
 
 	mu    sync.RWMutex
 	conns []*grpc.ClientConn
 }
 
-// NewGRPCClient creates a new gRPC streaming client.
+// String implements fmt.Stringer and never exposes the credential.
+func (c *GRPCClient) String() string {
+	return fmt.Sprintf("proofchain.GRPCClient{endpoint:%q apiKey:%q}", c.endpoint, redactSecret(c.apiKey))
+}
+
+// GoString implements fmt.GoStringer (%#v) and never exposes the credential.
+func (c *GRPCClient) GoString() string { return c.String() }
+
+// NewGRPCClient creates a new gRPC streaming client. TLS (minimum 1.2) is
+// always used regardless of port; see WithInsecurePlaintext for local
+// development.
 //
 // Example:
 //
-//	client := proofchain.NewGRPCClient("your-api-key")
+//	client, err := proofchain.NewGRPCClient("your-api-key")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
 //	defer client.Close()
 //
 //	stats, err := client.StreamEvents(ctx, events)
-func NewGRPCClient(apiKey string, opts ...GRPCClientOption) *GRPCClient {
+func NewGRPCClient(apiKey string, opts ...GRPCClientOption) (*GRPCClient, error) {
 	c := &GRPCClient{
 		apiKey:     apiKey,
 		endpoint:   defaultGRPCEndpoint,
 		timeout:    defaultGRPCTimeout,
-		useTLS:     true,
 		numStreams: 1,
 	}
 
@@ -122,12 +137,17 @@ func NewGRPCClient(apiKey string, opts ...GRPCClientOption) *GRPCClient {
 		opt(c)
 	}
 
-	// Auto-detect TLS based on port
-	if !strings.Contains(c.endpoint, ":443") && c.useTLS {
-		c.useTLS = false
+	if c.plaintext {
+		host, _, err := net.SplitHostPort(c.endpoint)
+		if err != nil {
+			host = c.endpoint
+		}
+		if !isLoopbackHost(host) {
+			return nil, fmt.Errorf("proofchain: WithInsecurePlaintext is only allowed for loopback endpoints, got %q", c.endpoint)
+		}
 	}
 
-	return c
+	return c, nil
 }
 
 // Connect establishes gRPC connections. Call this before streaming.
@@ -181,12 +201,11 @@ func (c *GRPCClient) Close() error {
 
 func (c *GRPCClient) dialEndpoint(ctx context.Context, endpoint string) (*grpc.ClientConn, error) {
 	var creds grpc.DialOption
-	if c.useTLS {
-		creds = grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{}))
-	} else {
+	if c.plaintext {
 		creds = grpc.WithTransportCredentials(insecure.NewCredentials())
+	} else {
+		creds = grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12}))
 	}
-
 	dialCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
@@ -459,7 +478,10 @@ func NewMultiStreamClient(apiKey string, opts ...GRPCClientOption) (*MultiStream
 	defaultOpts := []GRPCClientOption{WithNumStreams(4)}
 	opts = append(defaultOpts, opts...)
 
-	grpcClient := NewGRPCClient(apiKey, opts...)
+	grpcClient, err := NewGRPCClient(apiKey, opts...)
+	if err != nil {
+		return nil, err
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), grpcClient.timeout)
 	defer cancel()

@@ -6,10 +6,10 @@ Official Go SDK for [ProofChain](https://proofchain.co.za) - blockchain-anchored
 > `proofchain-infra/docs/ONBOARDING.md`, then
 > `proofchain-infra/docs/ARCHITECTURE.md`.
 >
-> **This repo holds two Go modules** and the root is not the one with the code.
-> Run `go build` / `go test` from inside `proofchain/` — `go build ./examples/...`
-> from the root fails, because examples import the nested module path that the
-> root `go.mod` neither requires nor replaces. See `CLAUDE.md`.
+> **This repo holds two Go modules.** The SDK lives in `proofchain/` (its own
+> `go.mod`); the root module only holds `examples/` and resolves the SDK through
+> a `replace` directive. Run `go build` / `go test` from inside `proofchain/`;
+> `go build ./...` from the root compiles the examples.
 
 ## Installation
 
@@ -31,8 +31,12 @@ import (
 )
 
 func main() {
-    // Create client
-    client := proofchain.NewClient("your-api-key")
+    // Create client (server-side only — an API key must never ship in a
+    // browser or mobile bundle; use NewEndUserClient with a user JWT there).
+    client, err := proofchain.NewClient("your-api-key")
+    if err != nil {
+        log.Fatal(err)
+    }
 
     // Attest a document
     result, err := client.Documents.Attest(context.Background(), &proofchain.AttestRequest{
@@ -74,7 +78,10 @@ import (
 
 func main() {
     // Create high-performance ingestion client
-    ingestion := proofchain.NewIngestionClient("your-api-key")
+    ingestion, err := proofchain.NewIngestionClient("your-api-key")
+    if err != nil {
+        log.Fatal(err)
+    }
     ctx := context.Background()
 
     // Single event (immediate attestation)
@@ -179,9 +186,13 @@ import (
 
 func main() {
     // Create gRPC client with 4 parallel streams
-    client := proofchain.NewGRPCClient("your-api-key",
+    // TLS (1.2+) is always used; WithInsecurePlaintext() only works for loopback.
+    client, err := proofchain.NewGRPCClient("your-api-key",
         proofchain.WithNumStreams(4),
     )
+    if err != nil {
+        log.Fatal(err)
+    }
 
     // Connect
     ctx := context.Background()
@@ -231,7 +242,10 @@ import (
 )
 
 func main() {
-    client := proofchain.NewClient("your-api-key")
+    client, err := proofchain.NewClient("your-api-key")
+    if err != nil {
+        log.Fatal(err)
+    }
     ctx := context.Background()
 
     // Create a state channel
@@ -363,6 +377,17 @@ webhooks, err := client.Webhooks.List(ctx)
 
 // Delete
 err = client.Webhooks.Delete(ctx, webhook.ID)
+
+// Verify a delivery in your HTTP handler. Pass the raw request body; the
+// signature is HMAC-SHA256 over those exact bytes (header "sha256=<hex>").
+func handler(w http.ResponseWriter, r *http.Request) {
+    body, _ := io.ReadAll(r.Body)
+    if err := proofchain.VerifyWebhookSignature(secret, body, r.Header.Get(proofchain.WebhookSignatureHeader)); err != nil {
+        http.Error(w, "bad signature", http.StatusUnauthorized)
+        return
+    }
+    // ... handle event
+}
 ```
 
 ## Error Handling
@@ -388,18 +413,37 @@ if err != nil {
 ## Configuration
 
 ```go
-// Custom configuration
-client := proofchain.NewClient(
+// Custom configuration. Base URLs must be https:// — http:// is only accepted
+// for loopback hosts (localhost, 127.0.0.1, ::1) or with WithInsecureHTTP().
+// Redirects are never followed, so credentials cannot leak to another origin.
+client, err := proofchain.NewClient(
     "your-api-key",
-    proofchain.WithBaseURL("https://ingest.proofchain.co.za"),  // Ingestion API (Rust)
-    proofchain.WithMgmtURL("https://api.proofchain.co.za"),     // Management API (Python)
+    proofchain.WithBaseURL("https://api.proofchain.co.za"),
     proofchain.WithTimeout(30 * time.Second),
     proofchain.WithRetries(3),
 )
 
-// From environment variable
-// Set PROOFCHAIN_API_KEY
-client := proofchain.NewClientFromEnv()
+// From environment variables (PROOFCHAIN_API_KEY, optional PROOFCHAIN_BASE_URL)
+client, err := proofchain.NewClientFromEnv()
+
+// Local development against a plaintext server on a non-loopback host
+client, err := proofchain.NewClient("key", proofchain.WithBaseURL("http://10.0.0.5:8080"), proofchain.WithInsecureHTTP())
+```
+
+### API keys
+
+```go
+// Scopes are required and must not include "admin" or "*". Keys expire after
+// 90 days unless ExpiresInDays is set.
+days := 30
+created, err := client.Tenant.CreateAPIKey(ctx, &proofchain.CreateAPIKeyRequest{
+    Name:          "ingest-worker",
+    Scopes:        []string{"events:write"},
+    ExpiresInDays: &days,
+    AllowedCIDRs:  []string{"10.0.0.0/8"},
+})
+// created.Key is shown once; store it in a secret manager. Never embed it in
+// a browser or mobile bundle. fmt.Println(created) prints a redacted key.
 ```
 
 ## Context Support

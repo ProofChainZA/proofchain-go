@@ -3,28 +3,94 @@ package proofchain
 
 import (
 	"context"
+	"fmt"
 	"net/url"
+	"strings"
 )
 
-// APIKey represents an API key for the tenant.
+// APIKey represents an API key for the tenant (as listed; never contains the secret).
 type APIKey struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	KeyPrefix   string     `json:"key_prefix"`
-	Permissions []string   `json:"permissions"`
-	CreatedAt   Timestamp  `json:"created_at"`
-	LastUsedAt  *Timestamp `json:"last_used_at,omitempty"`
-	ExpiresAt   *Timestamp `json:"expires_at,omitempty"`
-	IsActive    bool       `json:"is_active"`
-	// Key is only available when creating a new key
-	Key string `json:"key,omitempty"`
+	ID                 string     `json:"id"`
+	Name               string     `json:"name"`
+	KeyPrefix          string     `json:"key_prefix"`
+	Scopes             []string   `json:"scopes"`
+	RateLimitPerMinute int        `json:"rate_limit_per_minute"`
+	CreatedAt          Timestamp  `json:"created_at"`
+	LastUsedAt         *Timestamp `json:"last_used_at,omitempty"`
+	LastUsedIP         *string    `json:"last_used_ip,omitempty"`
+	ExpiresAt          *Timestamp `json:"expires_at,omitempty"`
+	IsActive           bool       `json:"is_active"`
+	AllowedCIDRs       []string   `json:"allowed_cidrs"`
+	NotifyNewIP        bool       `json:"notify_new_ip"`
+	// IsLegacyAdmin marks a pre-hardening key carrying "admin"/"*"; rotate it.
+	IsLegacyAdmin bool `json:"is_legacy_admin"`
 }
 
+// CreatedAPIKey is returned by CreateAPIKey. It is the only place the secret
+// Key is available. The returned key is shown once; never embed it in a
+// browser or mobile bundle.
+type CreatedAPIKey struct {
+	ID                 string     `json:"id"`
+	Name               string     `json:"name"`
+	KeyPrefix          string     `json:"key_prefix"`
+	Scopes             []string   `json:"scopes"`
+	RateLimitPerMinute int        `json:"rate_limit_per_minute"`
+	CreatedAt          Timestamp  `json:"created_at"`
+	ExpiresAt          *Timestamp `json:"expires_at,omitempty"`
+	AllowedCIDRs       []string   `json:"allowed_cidrs"`
+	NotifyNewIP        bool       `json:"notify_new_ip"`
+	IsLegacyAdmin      bool       `json:"is_legacy_admin"`
+	Warning            string     `json:"warning"`
+	// Key is the full secret. Read it once and store it in a secret manager.
+	Key string `json:"key"`
+}
+
+// String implements fmt.Stringer and redacts the secret key.
+func (k CreatedAPIKey) String() string {
+	return fmt.Sprintf("proofchain.CreatedAPIKey{ID:%q Name:%q KeyPrefix:%q Key:%q}", k.ID, k.Name, k.KeyPrefix, redactSecret(k.Key))
+}
+
+// GoString implements fmt.GoStringer (%#v) and redacts the secret key.
+func (k CreatedAPIKey) GoString() string { return k.String() }
+
 // CreateAPIKeyRequest contains parameters for creating an API key.
+//
+// Scopes is required and must not contain "admin" or "*" — the server rejects
+// such keys and the SDK validates this client-side. Keys expire after 90 days
+// unless ExpiresInDays is set. AllowedCIDRs restricts the networks the key
+// may be used from. NotifyNewIP (default true on the server) controls the
+// first-use-from-new-IP owner email.
 type CreateAPIKeyRequest struct {
-	Name          string   `json:"name"`
-	Permissions   []string `json:"permissions,omitempty"`
-	ExpiresInDays int      `json:"expires_in_days,omitempty"`
+	Name               string   `json:"name"`
+	Scopes             []string `json:"scopes"`
+	RateLimitPerMinute int      `json:"rate_limit_per_minute,omitempty"`
+	ExpiresInDays      *int     `json:"expires_in_days,omitempty"`
+	AllowedCIDRs       []string `json:"allowed_cidrs,omitempty"`
+	NotifyNewIP        *bool    `json:"notify_new_ip,omitempty"`
+}
+
+// validate checks the request client-side so an invalid key is never
+// requested from the server.
+func (r *CreateAPIKeyRequest) validate() error {
+	if r == nil {
+		return NewValidationError("request is required", nil)
+	}
+	if strings.TrimSpace(r.Name) == "" {
+		return NewValidationError("name is required", nil)
+	}
+	if len(r.Scopes) == 0 {
+		return NewValidationError("scopes is required and must be non-empty", nil)
+	}
+	for _, s := range r.Scopes {
+		switch strings.ToLower(strings.TrimSpace(s)) {
+		case "", "admin", "*":
+			return NewValidationError(fmt.Sprintf("scope %q is not allowed; request only the scopes the key needs", s), nil)
+		}
+	}
+	if r.ExpiresInDays != nil && *r.ExpiresInDays <= 0 {
+		return NewValidationError("expires_in_days must be a positive integer", nil)
+	}
+	return nil
 }
 
 // BlockchainStats contains blockchain statistics for the tenant.
@@ -67,19 +133,16 @@ func (r *TenantResource) ListAPIKeys(ctx context.Context) ([]APIKey, error) {
 }
 
 // CreateAPIKey creates a new API key.
-func (r *TenantResource) CreateAPIKey(ctx context.Context, req *CreateAPIKeyRequest) (*APIKey, error) {
-	payload := map[string]interface{}{
-		"name": req.Name,
-	}
-	if len(req.Permissions) > 0 {
-		payload["permissions"] = req.Permissions
-	}
-	if req.ExpiresInDays > 0 {
-		payload["expires_in_days"] = req.ExpiresInDays
+//
+// The returned key is shown once; never embed it in a browser or mobile
+// bundle. Scopes is required and must not contain "admin" or "*".
+func (r *TenantResource) CreateAPIKey(ctx context.Context, req *CreateAPIKeyRequest) (*CreatedAPIKey, error) {
+	if err := req.validate(); err != nil {
+		return nil, err
 	}
 
-	var result APIKey
-	err := r.http.Post(ctx, "/tenant/api-keys", payload, &result)
+	var result CreatedAPIKey
+	err := r.http.Post(ctx, "/tenant/api-keys", req, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +151,7 @@ func (r *TenantResource) CreateAPIKey(ctx context.Context, req *CreateAPIKeyRequ
 
 // DeleteAPIKey deletes an API key.
 func (r *TenantResource) DeleteAPIKey(ctx context.Context, keyID string) error {
-	return r.http.Delete(ctx, "/tenant/api-keys/"+keyID)
+	return r.http.Delete(ctx, "/tenant/api-keys/"+seg(keyID))
 }
 
 // UsageDetailed gets detailed usage statistics.
@@ -132,7 +195,7 @@ func (r *TenantResource) BlockchainStats(ctx context.Context) (*BlockchainStats,
 // BlockchainVerify verifies a certificate on the blockchain.
 func (r *TenantResource) BlockchainVerify(ctx context.Context, certificateID string) (*BlockchainProof, error) {
 	var result BlockchainProof
-	err := r.http.Get(ctx, "/tenant/blockchain/verify/"+certificateID, nil, &result)
+	err := r.http.Get(ctx, "/tenant/blockchain/verify/"+seg(certificateID), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +258,7 @@ func (r *TenantResource) SettleAll(ctx context.Context) (map[string]interface{},
 // SettleEvent settles a specific event immediately.
 func (r *TenantResource) SettleEvent(ctx context.Context, eventID string) (map[string]interface{}, error) {
 	var result map[string]interface{}
-	err := r.http.Post(ctx, "/tenant/events/"+eventID+"/settle", nil, &result)
+	err := r.http.Post(ctx, "/tenant/events/"+seg(eventID)+"/settle", nil, &result)
 	if err != nil {
 		return nil, err
 	}

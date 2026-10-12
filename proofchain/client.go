@@ -4,9 +4,13 @@
 // This SDK provides methods for attesting documents, managing events,
 // streaming to state channels, issuing certificates, and more.
 //
-// Basic usage:
+// Basic usage (server-side only — never ship an API key in a browser or
+// mobile bundle; use NewEndUserClient with a JWT for end-user apps):
 //
-//	client := proofchain.NewClient("your-api-key")
+//	client, err := proofchain.NewClient("your-api-key")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
 //	result, err := client.Documents.Attest(ctx, &proofchain.AttestRequest{
 //	    FilePath:  "contract.pdf",
 //	    UserID:    "user@example.com",
@@ -46,10 +50,14 @@ type Client struct {
 	PartnerKeys      *PartnerKeysClient
 }
 
-// NewClient creates a new ProofChain client.
-func NewClient(apiKey string, opts ...HTTPClientOption) *Client {
-	httpClient := NewHTTPClient(apiKey, opts...)
-	return newClientFromHTTP(httpClient)
+// NewClient creates a new ProofChain client. It returns an error when the
+// configured base URL is not https:// (see WithBaseURL / WithInsecureHTTP).
+func NewClient(apiKey string, opts ...HTTPClientOption) (*Client, error) {
+	httpClient, err := NewHTTPClient(apiKey, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return newClientFromHTTP(httpClient), nil
 }
 
 // NewClientFromEnv creates a client using the PROOFCHAIN_API_KEY environment variable.
@@ -72,12 +80,15 @@ func NewClientFromEnv(opts ...HTTPClientOption) (*Client, error) {
 //
 // Example:
 //
-//	client := proofchain.NewEndUserClient("eyJhbG...", "my-tenant-slug")
+//	client, err := proofchain.NewEndUserClient("eyJhbG...", "my-tenant-slug")
 //	passport, err := client.Passports.GetUserPassport(ctx, myUserID, nil)
-func NewEndUserClient(userToken, tenantID string, opts ...HTTPClientOption) *Client {
+func NewEndUserClient(userToken, tenantID string, opts ...HTTPClientOption) (*Client, error) {
 	opts = append([]HTTPClientOption{WithUserToken(userToken, tenantID)}, opts...)
-	httpClient := NewHTTPClient("", opts...)
-	return newClientFromHTTP(httpClient)
+	httpClient, err := NewHTTPClient("", opts...)
+	if err != nil {
+		return nil, err
+	}
+	return newClientFromHTTP(httpClient), nil
 }
 
 func newClientFromHTTP(httpClient *HTTPClient) *Client {
@@ -113,7 +124,7 @@ func newClientFromHTTP(httpClient *HTTPClient) *Client {
 // Verify verifies a document or event by its IPFS hash.
 func (c *Client) Verify(ctx context.Context, ipfsHash string) (*VerificationResult, error) {
 	var result VerificationResult
-	err := c.http.Get(ctx, "/verify/"+ipfsHash, nil, &result)
+	err := c.http.Get(ctx, "/verify/"+seg(ipfsHash), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +223,7 @@ func (r *DocumentsResource) AttestBytes(ctx context.Context, req *AttestBytesReq
 // Get retrieves a document by its IPFS hash.
 func (r *DocumentsResource) Get(ctx context.Context, ipfsHash string) (*Event, error) {
 	var result Event
-	err := r.http.Get(ctx, "/tenant/events/by-hash/"+ipfsHash, nil, &result)
+	err := r.http.Get(ctx, "/tenant/events/by-hash/"+seg(ipfsHash), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +265,7 @@ func (r *EventsResource) Create(ctx context.Context, req *CreateEventRequest) (*
 // Get retrieves an event by ID.
 func (r *EventsResource) Get(ctx context.Context, eventID string) (*Event, error) {
 	var result Event
-	err := r.http.Get(ctx, "/tenant/events/"+eventID, nil, &result)
+	err := r.http.Get(ctx, "/tenant/events/"+seg(eventID), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +342,7 @@ func (r *EventsResource) Search(ctx context.Context, req *SearchRequest) (*Searc
 // ByHash retrieves an event by its IPFS hash.
 func (r *EventsResource) ByHash(ctx context.Context, ipfsHash string) (*Event, error) {
 	var result Event
-	err := r.http.Get(ctx, "/tenant/events/by-hash/"+ipfsHash, nil, &result)
+	err := r.http.Get(ctx, "/tenant/events/by-hash/"+seg(ipfsHash), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +374,7 @@ func (r *ChannelsResource) Create(ctx context.Context, req *CreateChannelRequest
 // Get retrieves a channel by ID.
 func (r *ChannelsResource) Get(ctx context.Context, channelID string) (*Channel, error) {
 	var result Channel
-	err := r.http.Get(ctx, "/channels/"+channelID, nil, &result)
+	err := r.http.Get(ctx, "/channels/"+seg(channelID), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -373,7 +384,7 @@ func (r *ChannelsResource) Get(ctx context.Context, channelID string) (*Channel,
 // Status retrieves detailed status of a channel.
 func (r *ChannelsResource) Status(ctx context.Context, channelID string) (*ChannelStatus, error) {
 	var result ChannelStatus
-	err := r.http.Get(ctx, "/channels/"+channelID+"/status", nil, &result)
+	err := r.http.Get(ctx, "/channels/"+seg(channelID)+"/status", nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -416,7 +427,7 @@ func (r *ChannelsResource) Stream(ctx context.Context, channelID string, req *St
 	}
 
 	var result StreamAck
-	err := r.http.Post(ctx, "/channels/"+channelID+"/stream", payload, &result)
+	err := r.http.Post(ctx, "/channels/"+seg(channelID)+"/stream", payload, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -430,7 +441,7 @@ func (r *ChannelsResource) StreamBatch(ctx context.Context, channelID string, ev
 	}
 
 	var result map[string]interface{}
-	err := r.http.Post(ctx, "/channels/"+channelID+"/stream/batch", payload, &result)
+	err := r.http.Post(ctx, "/channels/"+seg(channelID)+"/stream/batch", payload, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -440,7 +451,7 @@ func (r *ChannelsResource) StreamBatch(ctx context.Context, channelID string, ev
 // Settle settles a channel on-chain.
 func (r *ChannelsResource) Settle(ctx context.Context, channelID string) (*Settlement, error) {
 	var result Settlement
-	err := r.http.Post(ctx, "/channels/"+channelID+"/settle", nil, &result)
+	err := r.http.Post(ctx, "/channels/"+seg(channelID)+"/settle", nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -450,7 +461,7 @@ func (r *ChannelsResource) Settle(ctx context.Context, channelID string) (*Settl
 // Close closes a channel.
 func (r *ChannelsResource) Close(ctx context.Context, channelID string) (*Channel, error) {
 	var result Channel
-	err := r.http.Post(ctx, "/channels/"+channelID+"/close", nil, &result)
+	err := r.http.Post(ctx, "/channels/"+seg(channelID)+"/close", nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -492,7 +503,7 @@ func (r *CertificatesResource) Issue(ctx context.Context, req *IssueCertificateR
 // Get retrieves a certificate by ID.
 func (r *CertificatesResource) Get(ctx context.Context, certificateID string) (*Certificate, error) {
 	var result Certificate
-	err := r.http.Get(ctx, "/certificates/"+certificateID, nil, &result)
+	err := r.http.Get(ctx, "/certificates/"+seg(certificateID), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -530,7 +541,7 @@ func (r *CertificatesResource) Revoke(ctx context.Context, certificateID, reason
 	}
 
 	var result Certificate
-	err := r.http.Post(ctx, "/certificates/"+certificateID+"/revoke", payload, &result)
+	err := r.http.Post(ctx, "/certificates/"+seg(certificateID)+"/revoke", payload, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -540,7 +551,7 @@ func (r *CertificatesResource) Revoke(ctx context.Context, certificateID, reason
 // Verify verifies a certificate.
 func (r *CertificatesResource) Verify(ctx context.Context, certificateID string) (map[string]interface{}, error) {
 	var result map[string]interface{}
-	err := r.http.Get(ctx, "/verify/certificate/"+certificateID, nil, &result)
+	err := r.http.Get(ctx, "/verify/certificate/"+seg(certificateID), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -573,7 +584,7 @@ func (r *WebhooksResource) Create(ctx context.Context, req *CreateWebhookRequest
 // Get retrieves a webhook by ID.
 func (r *WebhooksResource) Get(ctx context.Context, webhookID string) (*Webhook, error) {
 	var result Webhook
-	err := r.http.Get(ctx, "/webhooks/"+webhookID, nil, &result)
+	err := r.http.Get(ctx, "/webhooks/"+seg(webhookID), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -606,7 +617,7 @@ func (r *WebhooksResource) Update(ctx context.Context, webhookID string, req *Up
 	}
 
 	var result Webhook
-	err := r.http.Patch(ctx, "/webhooks/"+webhookID, payload, &result)
+	err := r.http.Patch(ctx, "/webhooks/"+seg(webhookID), payload, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -615,13 +626,13 @@ func (r *WebhooksResource) Update(ctx context.Context, webhookID string, req *Up
 
 // Delete deletes a webhook.
 func (r *WebhooksResource) Delete(ctx context.Context, webhookID string) error {
-	return r.http.Delete(ctx, "/webhooks/"+webhookID)
+	return r.http.Delete(ctx, "/webhooks/"+seg(webhookID))
 }
 
 // Test sends a test event to a webhook.
 func (r *WebhooksResource) Test(ctx context.Context, webhookID string) (map[string]interface{}, error) {
 	var result map[string]interface{}
-	err := r.http.Post(ctx, "/webhooks/"+webhookID+"/test", nil, &result)
+	err := r.http.Post(ctx, "/webhooks/"+seg(webhookID)+"/test", nil, &result)
 	if err != nil {
 		return nil, err
 	}

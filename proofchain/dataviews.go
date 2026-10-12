@@ -190,7 +190,7 @@ func (d *DataViewsClient) List(ctx context.Context) (*DataViewListResponse, erro
 // Get returns detailed information about a specific data view.
 func (d *DataViewsClient) Get(ctx context.Context, viewName string) (*DataViewDetail, error) {
 	var detail DataViewDetail
-	err := d.http.Get(ctx, "/data-mesh/views/custom/"+url.PathEscape(viewName), nil, &detail)
+	err := d.http.Get(ctx, "/data-mesh/views/custom/"+seg(viewName), nil, &detail)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func (d *DataViewsClient) Create(ctx context.Context, req *CreateDataViewRequest
 // Update updates an existing data view.
 func (d *DataViewsClient) Update(ctx context.Context, viewName string, req *UpdateDataViewRequest) (*DataViewDetail, error) {
 	var detail DataViewDetail
-	err := d.http.Patch(ctx, "/data-mesh/views/custom/"+url.PathEscape(viewName), req, &detail)
+	err := d.http.Patch(ctx, "/data-mesh/views/custom/"+seg(viewName), req, &detail)
 	if err != nil {
 		return nil, err
 	}
@@ -219,13 +219,13 @@ func (d *DataViewsClient) Update(ctx context.Context, viewName string, req *Upda
 
 // Delete deletes a data view.
 func (d *DataViewsClient) Delete(ctx context.Context, viewName string) error {
-	return d.http.Delete(ctx, "/data-mesh/views/custom/" + url.PathEscape(viewName))
+	return d.http.Delete(ctx, "/data-mesh/views/custom/"+seg(viewName))
 }
 
 // Execute executes a data view for a specific identifier (user ID or wallet address).
 func (d *DataViewsClient) Execute(ctx context.Context, identifier, viewName string) (*DataViewExecuteResult, error) {
 	var result DataViewExecuteResult
-	err := d.http.Get(ctx, "/data-mesh/views/"+url.PathEscape(identifier)+"/custom/"+url.PathEscape(viewName), nil, &result)
+	err := d.http.Get(ctx, "/data-mesh/views/"+seg(identifier)+"/custom/"+seg(viewName), nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +245,7 @@ func (d *DataViewsClient) Preview(ctx context.Context, req *DataViewPreviewReque
 // GetFanProfile returns the builtin fan profile view for a wallet.
 func (d *DataViewsClient) GetFanProfile(ctx context.Context, walletAddress string) (*FanProfileView, error) {
 	var result FanProfileView
-	err := d.http.Get(ctx, "/data-mesh/views/"+url.PathEscape(walletAddress)+"/fan-profile", nil, &result)
+	err := d.http.Get(ctx, "/data-mesh/views/"+seg(walletAddress)+"/fan-profile", nil, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +260,7 @@ func (d *DataViewsClient) GetActivitySummary(ctx context.Context, walletAddress 
 	}
 
 	var result ActivitySummaryView
-	err := d.http.Get(ctx, "/data-mesh/views/"+url.PathEscape(walletAddress)+"/activity-summary", params, &result)
+	err := d.http.Get(ctx, "/data-mesh/views/"+seg(walletAddress)+"/activity-summary", params, &result)
 	if err != nil {
 		return nil, err
 	}
