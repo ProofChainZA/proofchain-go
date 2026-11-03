@@ -4,50 +4,62 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strconv"
 	"time"
 )
 
 // RewardDefinition represents a reward configuration
 type RewardDefinition struct {
-	ID                   string                 `json:"id"`
-	Name                 string                 `json:"name"`
-	Slug                 string                 `json:"slug"`
-	Description          *string                `json:"description,omitempty"`
-	RewardType           string                 `json:"reward_type"`
-	Value                *float64               `json:"value,omitempty"`
-	ValueCurrency        *string                `json:"value_currency,omitempty"`
-	TokenContractAddress *string                `json:"token_contract_address,omitempty"`
-	TokenSymbol          *string                `json:"token_symbol,omitempty"`
-	TokenDecimals        int                    `json:"token_decimals"`
-	TokenChain           string                 `json:"token_chain"`
-	NFTMintingStrategy   *string                `json:"nft_minting_strategy,omitempty"`
-	NFTPreMintCount      *int                   `json:"nft_pre_mint_count,omitempty"`
-	NFTMintedPoolCount   int                    `json:"nft_minted_pool_count"`
-	NFTIsSoulbound       bool                   `json:"nft_is_soulbound"`
-	PassportThresholdID  *string                `json:"passport_threshold_id,omitempty"`
-	TriggerType          string                 `json:"trigger_type"`
-	TriggerConfig        map[string]interface{} `json:"trigger_config,omitempty"`
-	MaxPerUser           *int                   `json:"max_per_user,omitempty"`
-	MaxTotal             *int                   `json:"max_total,omitempty"`
-	CurrentIssued        int                    `json:"current_issued"`
-	IsActive             bool                   `json:"is_active"`
-	IconURL              *string                `json:"icon_url,omitempty"`
-	BadgeColor           *string                `json:"badge_color,omitempty"`
-	CreatedAt            time.Time              `json:"created_at"`
+	ID                     string                 `json:"id"`
+	Name                   string                 `json:"name"`
+	Slug                   string                 `json:"slug"`
+	Description            *string                `json:"description,omitempty"`
+	RewardType             string                 `json:"reward_type"`
+	Value                  *float64               `json:"value,omitempty"`
+	ValueCurrency          *string                `json:"value_currency,omitempty"`
+	TokenContractAddress   *string                `json:"token_contract_address,omitempty"`
+	TokenSymbol            *string                `json:"token_symbol,omitempty"`
+	TokenDecimals          int                    `json:"token_decimals"`
+	TokenChain             string                 `json:"token_chain"`
+	NFTMintingStrategy     *string                `json:"nft_minting_strategy,omitempty"`
+	NFTPreMintCount        *int                   `json:"nft_pre_mint_count,omitempty"`
+	NFTMintedPoolCount     int                    `json:"nft_minted_pool_count"`
+	NFTIsSoulbound         bool                   `json:"nft_is_soulbound"`
+	PassportThresholdID    *string                `json:"passport_threshold_id,omitempty"`
+	VoucherProductIDs      []string               `json:"voucher_product_ids,omitempty"`
+	VoucherCampaignID      *string                `json:"voucher_campaign_id,omitempty"`
+	VoucherLanguage        *string                `json:"voucher_language,omitempty"`
+	VoucherMessage         *string                `json:"voucher_message,omitempty"`
+	VoucherDeliveryMethods []string               `json:"voucher_delivery_methods,omitempty"`
+	TriggerType            string                 `json:"trigger_type"`
+	TriggerConfig          map[string]interface{} `json:"trigger_config,omitempty"`
+	MaxPerUser             *int                   `json:"max_per_user,omitempty"`
+	MaxTotal               *int                   `json:"max_total,omitempty"`
+	CurrentIssued          int                    `json:"current_issued"`
+	IsActive               bool                   `json:"is_active"`
+	IconURL                *string                `json:"icon_url,omitempty"`
+	BadgeColor             *string                `json:"badge_color,omitempty"`
+	CreatedAt              time.Time              `json:"created_at"`
 }
 
 // EarnedReward represents a reward earned by a user
 type EarnedReward struct {
-	ID             string     `json:"id"`
-	UserID         string     `json:"user_id"`
-	UserExternalID string     `json:"user_external_id"`
-	RewardName     string     `json:"reward_name"`
-	RewardType     string     `json:"reward_type"`
-	Status         string     `json:"status"`
-	NFTTokenID     *int       `json:"nft_token_id,omitempty"`
-	NFTTxHash      *string    `json:"nft_tx_hash,omitempty"`
-	EarnedAt       time.Time  `json:"earned_at"`
-	DistributedAt  *time.Time `json:"distributed_at,omitempty"`
+	ID             string  `json:"id"`
+	UserID         string  `json:"user_id"`
+	UserExternalID string  `json:"user_external_id"`
+	RewardName     string  `json:"reward_name"`
+	RewardType     string  `json:"reward_type"`
+	Status         string  `json:"status"`
+	NFTTokenID     *int    `json:"nft_token_id,omitempty"`
+	NFTTxHash      *string `json:"nft_tx_hash,omitempty"`
+	VoucherOrderID *string `json:"voucher_order_id,omitempty"`
+	// Voucher delivery tracking (Tremendous does not report redemption).
+	VoucherDeliveryMethod  *string    `json:"voucher_delivery_method,omitempty"`
+	VoucherDeliveryStatus  *string    `json:"voucher_delivery_status,omitempty"`
+	VoucherDeliveryFailure *string    `json:"voucher_delivery_failure,omitempty"`
+	VoucherStatusUpdatedAt *Timestamp `json:"voucher_status_updated_at,omitempty"`
+	EarnedAt               time.Time  `json:"earned_at"`
+	DistributedAt          *time.Time `json:"distributed_at,omitempty"`
 }
 
 // RewardAsset represents an asset for a reward
@@ -64,31 +76,36 @@ type RewardAsset struct {
 
 // Request types
 type CreateRewardDefinitionRequest struct {
-	Name                 string                 `json:"name"`
-	Slug                 string                 `json:"slug"`
-	Description          *string                `json:"description,omitempty"`
-	CampaignID           *string                `json:"campaign_id,omitempty"`
-	RewardType           string                 `json:"reward_type,omitempty"`
-	Value                *float64               `json:"value,omitempty"`
-	ValueCurrency        *string                `json:"value_currency,omitempty"`
-	TokenContractAddress *string                `json:"token_contract_address,omitempty"`
-	TokenSymbol          *string                `json:"token_symbol,omitempty"`
-	TokenDecimals        int                    `json:"token_decimals,omitempty"`
-	TokenChain           string                 `json:"token_chain,omitempty"`
-	NFTMetadataTemplate  map[string]interface{} `json:"nft_metadata_template,omitempty"`
-	NFTIsSoulbound       bool                   `json:"nft_is_soulbound,omitempty"`
-	NFTValidityDays      *int                   `json:"nft_validity_days,omitempty"`
-	NFTMintingStrategy   string                 `json:"nft_minting_strategy,omitempty"`
-	NFTPreMintCount      *int                   `json:"nft_pre_mint_count,omitempty"`
-	PassportThresholdID  *string                `json:"passport_threshold_id,omitempty"`
-	TriggerType          string                 `json:"trigger_type,omitempty"`
-	TriggerConfig        map[string]interface{} `json:"trigger_config,omitempty"`
-	MaxPerUser           *int                   `json:"max_per_user,omitempty"`
-	MaxTotal             *int                   `json:"max_total,omitempty"`
-	IsActive             bool                   `json:"is_active,omitempty"`
-	IconURL              *string                `json:"icon_url,omitempty"`
-	BadgeColor           *string                `json:"badge_color,omitempty"`
-	IsPublic             bool                   `json:"is_public,omitempty"`
+	Name                   string                 `json:"name"`
+	Slug                   string                 `json:"slug"`
+	Description            *string                `json:"description,omitempty"`
+	CampaignID             *string                `json:"campaign_id,omitempty"`
+	RewardType             string                 `json:"reward_type,omitempty"`
+	Value                  *float64               `json:"value,omitempty"`
+	ValueCurrency          *string                `json:"value_currency,omitempty"`
+	TokenContractAddress   *string                `json:"token_contract_address,omitempty"`
+	TokenSymbol            *string                `json:"token_symbol,omitempty"`
+	TokenDecimals          int                    `json:"token_decimals,omitempty"`
+	TokenChain             string                 `json:"token_chain,omitempty"`
+	NFTMetadataTemplate    map[string]interface{} `json:"nft_metadata_template,omitempty"`
+	NFTIsSoulbound         bool                   `json:"nft_is_soulbound,omitempty"`
+	NFTValidityDays        *int                   `json:"nft_validity_days,omitempty"`
+	NFTMintingStrategy     string                 `json:"nft_minting_strategy,omitempty"`
+	NFTPreMintCount        *int                   `json:"nft_pre_mint_count,omitempty"`
+	PassportThresholdID    *string                `json:"passport_threshold_id,omitempty"`
+	VoucherProductIDs      []string               `json:"voucher_product_ids,omitempty"`
+	VoucherCampaignID      *string                `json:"voucher_campaign_id,omitempty"`
+	VoucherLanguage        *string                `json:"voucher_language,omitempty"`
+	VoucherMessage         *string                `json:"voucher_message,omitempty"`
+	VoucherDeliveryMethods []string               `json:"voucher_delivery_methods,omitempty"`
+	TriggerType            string                 `json:"trigger_type,omitempty"`
+	TriggerConfig          map[string]interface{} `json:"trigger_config,omitempty"`
+	MaxPerUser             *int                   `json:"max_per_user,omitempty"`
+	MaxTotal               *int                   `json:"max_total,omitempty"`
+	IsActive               bool                   `json:"is_active,omitempty"`
+	IconURL                *string                `json:"icon_url,omitempty"`
+	BadgeColor             *string                `json:"badge_color,omitempty"`
+	IsPublic               bool                   `json:"is_public,omitempty"`
 }
 
 type ManualRewardRequest struct {
@@ -266,6 +283,123 @@ func (r *RewardsClient) ClaimReward(ctx context.Context, earnedRewardID, walletA
 		return nil, err
 	}
 	return &result, nil
+}
+
+// Voucher delivery methods for VoucherDelivery.Method and
+// RewardDefinition.VoucherDeliveryMethods.
+const (
+	VoucherDeliveryLink  = "link"
+	VoucherDeliveryEmail = "email"
+	VoucherDeliverySMS   = "sms"
+)
+
+// VoucherDelivery selects how a voucher is delivered at claim time. Email is
+// required for VoucherDeliveryEmail, Phone (E.164) for VoucherDeliverySMS; Name
+// is optional. Contact details are sent to the provider and never stored by
+// Proofchain; do not log or cache them.
+type VoucherDelivery struct {
+	Method string `json:"method"`
+	Email  string `json:"email,omitempty"`
+	Phone  string `json:"phone,omitempty"`
+	Name   string `json:"name,omitempty"`
+}
+
+// ClaimVoucherResult carries the claim outcome. RedemptionURL is set only for
+// link delivery (nil for email/SMS) and is a secret: open it directly and never
+// persist, log, or cache it. DeliveryStatus is one of pending, delivered,
+// failed, canceled, flagged or blocked.
+type ClaimVoucherResult struct {
+	Success        bool       `json:"success"`
+	RewardID       string     `json:"reward_id"`
+	Status         string     `json:"status"`
+	RedemptionURL  *string    `json:"redemption_url,omitempty"`
+	ExpiresAt      *Timestamp `json:"expires_at,omitempty"`
+	DeliveryMethod string     `json:"delivery_method,omitempty"`
+	DeliveryStatus string     `json:"delivery_status,omitempty"`
+}
+
+// VoucherProductSKU is a face-value band a voucher product supports in one currency.
+type VoucherProductSKU struct {
+	Min          float64 `json:"min"`
+	Max          float64 `json:"max"`
+	CurrencyCode string  `json:"currency_code"`
+}
+
+// VoucherAllFeeFree is a sentinel for voucher_product_ids (case-insensitive):
+// on create/update the server replaces it with every fee-free product offered in
+// the definition's value currency whose range fits the value. Several product
+// IDs let the fan choose on the redemption page.
+const VoucherAllFeeFree = "ALL_FEE_FREE"
+
+// VoucherProduct is a gift-card product selectable for voucher rewards.
+type VoucherProduct struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Category    string  `json:"category"`
+	Subcategory *string `json:"subcategory,omitempty"`
+	ImageURL    *string `json:"image_url,omitempty"`
+	Description *string `json:"description,omitempty"`
+	// Disclosure is provider legal HTML; it is untrusted and must be sanitized
+	// before rendering.
+	Disclosure        *string             `json:"disclosure,omitempty"`
+	UsageInstructions *string             `json:"usage_instructions,omitempty"`
+	FeeFree           bool                `json:"fee_free"`
+	CurrencyCodes     []string            `json:"currency_codes"`
+	Countries         []string            `json:"countries"`
+	SKUs              []VoucherProductSKU `json:"skus"`
+}
+
+// ListVoucherProductsParams filters the voucher catalog by one ISO-3166 alpha-2
+// country (e.g. "GB") and/or one ISO-4217 currency (e.g. "GBP"). Category and
+// Subcategory are comma-separated lists (e.g. "merchant_card,charity"). FeeFree
+// nil returns all products; a pointer to false sends fee_free=false.
+type ListVoucherProductsParams struct {
+	Country     string
+	Currency    string
+	Category    string
+	Subcategory string
+	FeeFree     *bool
+}
+
+// ClaimVoucher claims an issued voucher reward. A nil delivery sends no body
+// (link delivery: each call yields a fresh RedemptionURL; never persist, log,
+// or cache it). Email/SMS delivery orders the gift card at claim time and the
+// provider sends it to the fan; RedemptionURL is then nil.
+func (r *RewardsClient) ClaimVoucher(ctx context.Context, earnedRewardID string, delivery *VoucherDelivery) (*ClaimVoucherResult, error) {
+	var body interface{}
+	if delivery != nil {
+		body = map[string]*VoucherDelivery{"delivery": delivery}
+	}
+	var result ClaimVoucherResult
+	if err := r.http.Post(ctx, "/rewards/earned/"+seg(earnedRewardID)+"/claim", body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ListVoucherProducts lists gift-card products available for voucher rewards.
+func (r *RewardsClient) ListVoucherProducts(ctx context.Context, opts *ListVoucherProductsParams) ([]VoucherProduct, error) {
+	params := url.Values{}
+	if opts != nil {
+		if opts.Country != "" {
+			params.Set("country", opts.Country)
+		}
+		if opts.Currency != "" {
+			params.Set("currency", opts.Currency)
+		}
+		if opts.Category != "" {
+			params.Set("category", opts.Category)
+		}
+		if opts.Subcategory != "" {
+			params.Set("subcategory", opts.Subcategory)
+		}
+		if opts.FeeFree != nil {
+			params.Set("fee_free", strconv.FormatBool(*opts.FeeFree))
+		}
+	}
+	var products []VoucherProduct
+	err := r.http.Get(ctx, "/rewards/voucher-products", params, &products)
+	return products, err
 }
 
 // AwardManual manually awards rewards to users
